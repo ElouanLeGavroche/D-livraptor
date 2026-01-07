@@ -19,9 +19,11 @@
 #define KEMENNADENN_DEGEMER "-> : "
 
 
-
+// RESPONT AR SERVER 
 #define DEMAT_RESPONT "demat implijer\n"
-#define GUDENN_RESPONT "eur fazhi zo barzh o komand\n"
+#define GUDENN_RESPONT "eur fazhi zo, barzh o komand\n"
+#define GUDENN_GER_KUZH "ur fazhi zo, adklaskit marc'hplij\n"
+#define NIVEREN_RESPONT "niveren : "
 
 // KOMMANDE AN IMPLIJER
 
@@ -50,13 +52,17 @@ typedef char *t_listen[MAX_PARAMETROU];
 void skriv_kemennadenn(int type, int kemennadenn);
 void lazhan_ur_bugel();
 
+
+int lenn(int cnx, t_chadenn *buffer);
+int enskrivadur(int cnx);
 int kemennadenn(int cnx);
+
 
 /* stadoù 
     = 0 peptra zo mat
     = -1 fazi
 */
-int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id);
+int stad_1();
 int stad_2();
 int stad_3();
 int stad_4();
@@ -115,8 +121,8 @@ int main(){
 
         if(pid == 0){
             // Ma ez eo ur bugel, mont barzh a ac'hwel vit ober war dro ar kom
-            kemennadenn(cnx);
-            
+            //kemennadenn(cnx);
+            enskrivadur(cnx);
             shutdown(cnx, SHUT_RDWR);
             close(cnx);
             _exit(0);
@@ -126,9 +132,37 @@ int main(){
     return EXIT_SUCCESS;
 }
 
-bool o_trein = true;
-int kemennadenn(int cnx){
+int lenn(int cnx, t_chadenn *buffer){
+    /*lecture*/
+    ssize_t n = read(cnx, *buffer, HIRDER_KEMENNADENN - 1);
+    if (n <= 0) 
+        return -1;
+    *buffer[n] = '\0';
+    int taille = strlen(*buffer);
+    
+    return taille;
+}
+
+int enskrivadur(int cnx){
+    t_chadenn anavezer;
+    t_chadenn ger_kuzh;
+
     skriv_kemennadenn(1, 1);
+    int i;
+    for(i = 0; i < 3; i ++){
+        if(i != 0){
+            write(cnx, GUDENN_GER_KUZH, strlen(GUDENN_GER_KUZH));    
+        }
+        write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
+        t_chadenn buffer = {'\0'};
+        lenn(cnx, buffer);
+    }
+    return 0;
+}
+
+int kemennadenn(int cnx){
+    bool o_trein = true;
+
     t_chadenn buffer = {'\0'};
 
     t_listen argv;
@@ -143,13 +177,7 @@ int kemennadenn(int cnx){
         write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
         
         /*lecture*/
-        ssize_t n = read(cnx, buffer, HIRDER_KEMENNADENN - 1);
-        if (n <= 0) 
-            break;
-        buffer[n] = '\0';
-        int taille = strlen(buffer);
-        
-        
+        int taille = lenn(cnx, &buffer);
 
         /*MESSAGE DE L'UTILISATEUR*/
         skriv_kemennadenn(1, 3);    
@@ -331,7 +359,7 @@ int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id){
         //strcat(bordereau, "CMD");
         strftime(bordereau, sizeof(bordereau), "%H%M%S", t); //Kaout an amzer barzh ur chadenn 
         strcat(bordereau, id); //Lakaat id ar produce warlec'h
-        strcpy(*chadenn_bordereau, bordereau); //Lakaat tout ze barzh ar kemm
+        strcpy(*chadenn_bordereau, bordereau); //Lakaat tout ze barzh an argemmenn
 
         return 0;
     }
