@@ -4,7 +4,7 @@ SET SCHEMA 'delivraptor';
 
 DROP TABLE IF EXISTS delivraptor.utilisateur, delivraptor.colis, delivraptor.liaison_colis_user;
 CREATE TABLE delivraptor.utilisateur(
-    bordereau INT NOT NULL UNIQUE PRIMARY KEY,
+    bordereau BIGINT NOT NULL UNIQUE PRIMARY KEY,
     etape INT
 )
 
@@ -13,13 +13,16 @@ CREATE TABLE delivraptor.colis(
 )
 
 CREATE TABLE delivraptor.liaison_colis_user(
-    id_colis INT,
-    id_utilisateur INT,
+    id_colis BIGINT NOT NULL,
+    id_utilisateur BIGINT NOT NULL,
 
     CONSTRAINT fk_liasion_colis FOREIGN KEY (id_colis)
-        REFERENCES colis(id) ON DELETE CASCADE,
+        REFERENCES delivraptor.colis(id) ON DELETE CASCADE,
 
     CONSTRAINT fk_liaison_utilisateur FOREIGN KEY (id_utilisateur)
-        REFERENCES utilisateur(bordereau) ON DELETE CASCADE
+        REFERENCES delivraptor.utilisateur(bordereau) ON DELETE CASCADE
 
 )
+
+INSERT INTO delivraptor.utilisateur (bordereau, etape) 
+    VALUES (452, '1');
