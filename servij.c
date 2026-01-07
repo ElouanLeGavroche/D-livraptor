@@ -1,3 +1,6 @@
+// Pour éviter que certaine lignes ne râle dans l'IDE pour rien.
+#define _POSIX_C_SOURCE 200809L
+
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -12,9 +15,12 @@
 #include <string.h>
 #include <time.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 #include <regex.h>
 
+//BDD
+#include <libpq-fe.h>
 
 #define KEMENNADENN_DEGEMER "-> : "
 
@@ -86,11 +92,34 @@ int main(){
     struct sigaction act;
 
     act.sa_handler = &lazhan_ur_bugel;
+    sigemptyset(&act.sa_mask);
+
+    act.sa_flags = SA_RESTART;
 
     sigaction(SIGCHLD, &act, NULL);
 
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	skriv_kemennadenn(4, 2);
+
+    
+    
+    //VIT AR bdd
+    PGconn *conn = PQconnectdb(
+        "host=localhost port=5432 dbname=saedb user=sae password=racine"
+    );
+
+    if (PQstatus(conn) != CONNECTION_OK) {
+        fprintf(stderr, "Erreur de connexion : %s\n", PQerrorMessage(conn));
+        PQfinish(conn);
+        return EXIT_FAILURE;
+    }
+
+    skriv_kemennadenn(4, 3);
+    // Kon krouet
+
+    
+
+    PQfinish(conn);
 
 	int opt = 1;
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))){
@@ -105,12 +134,10 @@ int main(){
 
     size = sizeof(conn_addr);
 
-
+    ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
+    ret = listen(sock, 1);
 
     while(true){
-
-        ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
-        ret = listen(sock, 1);
 
         if(ret == -1){
             return EXIT_FAILURE;
@@ -120,9 +147,9 @@ int main(){
         pid_t pid = fork();
 
         if(pid == 0){
-            // Ma ez eo ur bugel, mont barzh a ac'hwel vit ober war dro ar kom
-            //kemennadenn(cnx);
-            enskrivadur(cnx);
+            // Ma ez eo ur bugel, mont barzh ha ac'hwel vit ober war dro ar kom
+            kemennadenn(cnx);
+            //enskrivadur(cnx);
             shutdown(cnx, SHUT_RDWR);
             close(cnx);
             _exit(0);
@@ -139,13 +166,13 @@ int lenn(int cnx, t_chadenn *buffer){
         return -1;
     *buffer[n] = '\0';
     int taille = strlen(*buffer);
-    
     return taille;
 }
 
 int enskrivadur(int cnx){
-    t_chadenn anavezer;
-    t_chadenn ger_kuzh;
+    /* WIP : Fonction d'inscription non fini*/
+    //t_chadenn anavezer;
+    //t_chadenn ger_kuzh;
 
     skriv_kemennadenn(1, 1);
     int i;
@@ -155,7 +182,7 @@ int enskrivadur(int cnx){
         }
         write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
         t_chadenn buffer = {'\0'};
-        lenn(cnx, buffer);
+        lenn(cnx, &buffer);
     }
     return 0;
 }
@@ -192,31 +219,31 @@ int kemennadenn(int cnx){
             argv[argc++] = token;
             token = strtok(NULL, " ");
         }
-        
-        skriv_kemennadenn(1, 4);
+        if(argc != 0){
+            skriv_kemennadenn(1, 4);
 
-        //KROUIN UN BEAUREDAU NEVEZ
-        if(strncmp(argv[0], KIR_ENROLAN, sizeof(KIR_ENROLAN) - 1) == 0){
-            
-            t_chadenn_bordereau chadenn_bordereau;
-            stad_1(&chadenn_bordereau, argv[1]);
+            //KROUIN UN BEAUREDAU NEVEZ
+            if(strncmp(argv[0], KIR_ENROLAN, sizeof(KIR_ENROLAN) - 1) == 0){
+                
+                t_chadenn_bordereau chadenn_bordereau;
+                stad_1(&chadenn_bordereau, argv[1]);
 
-            //Digas ar Beauredeau d'an implijer
-            write(cnx, chadenn_bordereau, strlen(chadenn_bordereau));
+                //Digas ar Beauredeau d'an implijer
+                write(cnx, chadenn_bordereau, strlen(chadenn_bordereau));
 
+            }
+            //TEST RESPONT
+            else if(strncmp(argv[0], DEMAT, sizeof(DEMAT) - 1) == 0){
+                write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
+            }           
+            //VIT LAK FINN
+            else if(strncmp(argv[0], FINN_KOJEADENN, strlen(FINN_KOJEADENN) - 1) == 0){
+                o_trein = false;
+            }
+            else{
+                write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));
+            }
         }
-        //TEST RESPONT
-        else if(strncmp(argv[0], DEMAT, sizeof(DEMAT) - 1) == 0){
-            write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
-        }           
-        //VIT LAK FINN
-        else if(strncmp(argv[0], FINN_KOJEADENN, strlen(FINN_KOJEADENN) - 1) == 0){
-            o_trein = false;
-        }
-        else{
-            write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));
-        }
-        
     }while(o_trein == true);
 
     skriv_kemennadenn(1, 5);  
@@ -245,6 +272,7 @@ void skriv_kemennadenn(int seurt, int kemennadenn){
         4 [SERVER INIT]
             4.1 Krouidigezh an dalc'h
             4.2 Krouidigezh ar soket
+            4.3 Kevreadenn gant ar BDD graet
         5 [KEMENNADER AN IMPLIJER]
             5.1
     */
@@ -317,6 +345,10 @@ void skriv_kemennadenn(int seurt, int kemennadenn){
                     printf("Krouidigezh ar soket.\n");
                     break;
 
+                case 3:
+                    printf("Kevreadenn gant ar BDD graet. \n");
+                    break;
+
                 default:
                     printf("netra vit poent\n");
                     break;
@@ -341,10 +373,9 @@ void skriv_kemennadenn(int seurt, int kemennadenn){
     }
 }
 
-
 void lazhan_ur_bugel(){
+    waitpid(-1, NULL, WNOHANG);
     skriv_kemennadenn(1, 6);
-
 }
 
 int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id){
