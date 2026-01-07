@@ -10,25 +10,42 @@
 
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <signal.h>
 
 #include <regex.h>
 
-#define HIRDER_KEMENNADENN 1024
 
-#define RESPONT_KELOU_RESEVET "[SERVER INFO] keloù resevet\n"
+#define KEMENNADENN_DEGEMER "-> : "
 
-#define KEMENNADENN_DEGEMER "goulennoù an implijer : "
 
-#define PING "PING"
-#define PONG "PONG"
 
-#define DEMAT "DEMAT"
 #define DEMAT_RESPONT "demat implijer\n"
+#define GUDENN_RESPONT "eur fazhi zo barzh o komand\n"
 
-#define FINN_KOJEADENN "kuit"
+// KOMMANDE AN IMPLIJER
 
-typedef char t_message;
+//Test
+#define DEMAT "DEMAT"
+
+//Lak find'ar kemenadenn
+#define FINN_KOJEADENN "KUIT"
+
+// KIR = kemenadenn Implijer Resevet
+// s1
+#define KIR_ENROLAN "CREATE"
+
+//s2
+#define KIR_HED_KUIT "s2"
+
+
+#define HIRDER_KEMENNADENN 1024
+#define HIRDER_CHADENN_BORDEREAU 33
+#define MAX_PARAMETROU 5
+
+typedef char t_chadenn_bordereau[HIRDER_CHADENN_BORDEREAU];
+typedef char t_chadenn[HIRDER_KEMENNADENN];
+typedef char *t_listen[MAX_PARAMETROU];
 
 void skriv_kemennadenn(int type, int kemennadenn);
 void lazhan_ur_bugel();
@@ -39,7 +56,7 @@ int kemennadenn(int cnx);
     = 0 peptra zo mat
     = -1 fazi
 */
-int stad_1();
+int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id);
 int stad_2();
 int stad_3();
 int stad_4();
@@ -109,55 +126,73 @@ int main(){
     return EXIT_SUCCESS;
 }
 
+bool o_trein = true;
 int kemennadenn(int cnx){
-    int ret;
-
     skriv_kemennadenn(1, 1);
-    
-    
-    char buffer[HIRDER_KEMENNADENN] = {'\0'};
+    t_chadenn buffer = {'\0'};
+
+    t_listen argv;
+    int argc;
 
     do{
-         
-        char message[HIRDER_KEMENNADENN];
-        int taille = 0;
+        
+        //Reset propre des variables
+        memset(buffer,0,sizeof(buffer));
+        memset(argv,0,sizeof(argv));
 
         write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
         
         /*lecture*/
-        read(cnx, &buffer, HIRDER_KEMENNADENN);			
-        taille = strlen(buffer);
-
-        skriv_kemennadenn(1, 3);    
+        ssize_t n = read(cnx, buffer, HIRDER_KEMENNADENN - 1);
+        if (n <= 0) 
+            break;
+        buffer[n] = '\0';
+        int taille = strlen(buffer);
+        
+        
 
         /*MESSAGE DE L'UTILISATEUR*/
+        skriv_kemennadenn(1, 3);    
         skriv_kemennadenn(5, 1);
-        ret = printf("%*.*s", taille, taille, buffer);
-        if(ret == -1){
-            return EXIT_FAILURE;
-        }
+        printf("%*.*s", taille, taille, buffer);
 
-        skriv_kemennadenn(1, 4);
+        argc = 0;
 
-        if(strncmp(buffer, PING, sizeof(PING) - 1) == 0){
-            int i;
-            for(i = 0; i < 4; i ++){
-                sprintf(message, "PONG N°%d\n", i);
-                write(cnx, RESPONT_KELOU_RESEVET, sizeof(RESPONT_KELOU_RESEVET));
-                write(cnx, message, strlen(message));
+        char *token = strtok(buffer, " ");
 
-            }
-        }
-
-        if(strncmp(buffer, DEMAT, sizeof(DEMAT) - 1) == 0){
-            write(cnx, RESPONT_KELOU_RESEVET, sizeof(RESPONT_KELOU_RESEVET));
-            write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
+        while (token != NULL && argc < MAX_PARAMETROU) {
+            argv[argc++] = token;
+            token = strtok(NULL, " ");
         }
         
-    }while(strncmp(buffer, FINN_KOJEADENN, strlen(FINN_KOJEADENN) - 1) != 0);
+        skriv_kemennadenn(1, 4);
+
+        //KROUIN UN BEAUREDAU NEVEZ
+        if(strncmp(argv[0], KIR_ENROLAN, sizeof(KIR_ENROLAN) - 1) == 0){
+            
+            t_chadenn_bordereau chadenn_bordereau;
+            stad_1(&chadenn_bordereau, argv[1]);
+
+            //Digas ar Beauredeau d'an implijer
+            write(cnx, chadenn_bordereau, strlen(chadenn_bordereau));
+
+        }
+        //TEST RESPONT
+        else if(strncmp(argv[0], DEMAT, sizeof(DEMAT) - 1) == 0){
+            write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
+        }           
+        //VIT LAK FINN
+        else if(strncmp(argv[0], FINN_KOJEADENN, strlen(FINN_KOJEADENN) - 1) == 0){
+            o_trein = false;
+        }
+        else{
+            write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));
+        }
+        
+    }while(o_trein == true);
 
     skriv_kemennadenn(1, 5);  
-    return 0;
+    return EXIT_SUCCESS;
 
 }
 
@@ -282,4 +317,27 @@ void skriv_kemennadenn(int seurt, int kemennadenn){
 void lazhan_ur_bugel(){
     skriv_kemennadenn(1, 6);
 
+}
+
+int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id){
+    if(id != NULL){
+        //Kaout an amzer
+        time_t now = time(NULL);
+        struct tm *t = localtime(&now);
+
+        //Krouiñ ur kemmus vit ar bordereau
+        t_chadenn_bordereau bordereau;
+
+        //strcat(bordereau, "CMD");
+        strftime(bordereau, sizeof(bordereau), "%H%M%S", t); //Kaout an amzer barzh ur chadenn 
+        strcat(bordereau, id); //Lakaat id ar produce warlec'h
+        strcpy(*chadenn_bordereau, bordereau); //Lakaat tout ze barzh ar kemm
+
+        return 0;
+    }
+    return -1;
+}
+
+int stad_2(){
+    return 0;
 }
