@@ -23,35 +23,19 @@
 #include <libpq-fe.h>
 
 #define KEMENNADENN_DEGEMER "-> : "
+#define KEMENADDENN_ENSKIRVET " Servij -> :"
 
 // RESPONT AR SERVER
 #define DEMAT_RESPONT "demat implijer\n"
 #define GUDENN_RESPONT "eur fazhi zo, barzh o komand\n"
-#define GUDENN_GER_KUZH "ur fazhi zo, adklaskit marc'hplij\n"
+#define GUDENN_LOG "fazi gant an identelezh, c'huited\n"
 #define NIVEREN_RESPONT "niveren : "
-
-// KOMMANDE AN IMPLIJER
-
-// Test
-#define DEMAT "DEMAT"
-
-// Lak find'ar kemenadenn
-#define FINN_KOJEADENN "KUIT"
-
-// KIR = kemenadenn Implijer Resevet
-// s1
-#define KIR_ENROLAN "CREATE"
-
-// s2
-#define KIR_HED_KUIT "s2"
 
 #define HIRDER_KEMENNADENN 1024
 #define HIRDER_CHADENN_BORDEREAU 33
-#define MAX_PARAMETROU 5
 
 typedef char t_chadenn_bordereau[HIRDER_CHADENN_BORDEREAU];
 typedef char t_chadenn[HIRDER_KEMENNADENN];
-typedef char *t_listen[MAX_PARAMETROU];
 
 void skriv_kemennadenn(int type, int kemennadenn);
 void lazhan_ur_bugel();
@@ -64,7 +48,7 @@ int kemennadenn(int cnx, PGconn *conn);
     = 0 peptra zo mat
     = -1 fazi
 */
-int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id, PGconn *conn);
+int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn);
 int stad_2();
 int stad_3();
 int stad_4();
@@ -73,6 +57,26 @@ int stad_6();
 int stad_7();
 int stad_8();
 int stad_9();
+
+
+// Test
+const char KIR_DEMAT[] = "DEMAT";
+
+// Lak find'ar kemenadenn
+const char KIR_FINN_KOJEADENN[] = "KUIT";
+
+// KIR = kemenadenn Implijer Resevet
+// Konnektin
+const char KIR_KONEKTIN[] = "CONN %s %s";
+// Krouiñ ur bordereau
+const char KIR_ENROLAN[] = "CREATE %253s";
+// Kaout Bordereau unann benak
+const char KIR_KAOUT[] = "GET";
+// Tremen d'ar stad goude
+const char KIR_WAR_LECH[] = "NEXT";
+
+// s2
+const char KIR_HED_KUIT[] = "s2";
 
 int main()
 {
@@ -127,15 +131,17 @@ int main()
     size = sizeof(conn_addr);
 
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
+    if(ret == -1){
+        return EXIT_FAILURE;
+    }
+
     ret = listen(sock, 1);
+    if(ret == -1){
+        return EXIT_FAILURE;
+    }
 
     while (true)
     {
-
-        if (ret == -1)
-        {
-            return EXIT_FAILURE;
-        }
 
         cnx = accept(sock, (struct sockaddr *)&conn_addr, (socklen_t *)&size);
         pid_t pid = fork();
@@ -143,45 +149,124 @@ int main()
         if (pid == 0)
         {
             // Ma ez eo ur bugel, mont barzh ha ac'hwel vit ober war dro ar kom
+            enskrivadur(cnx, conn);
             kemennadenn(cnx, conn);
-            // enskrivadur(cnx, conn);
+            
             shutdown(cnx, SHUT_RDWR);
             close(cnx);
             _exit(0);
         }
     }
+    PQfinish(conn);
     return EXIT_SUCCESS;
 }
 
+/*
 int lenn(int cnx, t_chadenn *buffer)
 {
-    /*lecture*/
+    //Lennadenn
     ssize_t n = read(cnx, *buffer, HIRDER_KEMENNADENN - 1);
-    if (n <= 0)
-        return -1;
+    if (n <= 0) {return -1;}
+
     *buffer[n] = '\0';
     int taille = strlen(*buffer);
     return taille;
 }
+*/
+
+int lenn(int cnx, t_chadenn *buffer)
+{
+    int dalch = 0;
+    char c = '\0';
+
+    //lagadenn vit lenn
+    while (dalch < HIRDER_KEMENNADENN - 1 && c != '\n') {
+        ssize_t n = read(cnx, &c, 1);
+        if (n <= 0) {return -1;}
+
+        //Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
+        (*buffer)[dalch++] = c;
+    }
+
+    //Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
+    (*buffer)[dalch] = '\0';
+    return dalch;
+}
+
 
 int enskrivadur(int cnx, PGconn *conn)
 {
-    /* WIP : Fonction d'inscription non fini*/
-    // t_chadenn anavezer;
-    // t_chadenn ger_kuzh;
+    //Buffer vit kemenadenn an implijer
+    t_chadenn buffer = {'\0'};
+    t_chadenn identelezh;
+    t_chadenn ger_kuz;
 
-    skriv_kemennadenn(1, 1);
-    int i;
-    for (i = 0; i < 3; i++)
-    {
-        if (i != 0)
-        {
-            write(cnx, GUDENN_GER_KUZH, strlen(GUDENN_GER_KUZH));
-        }
+    bool kenkas_reiz = false;
+
+    do{
+        skriv_kemennadenn(1, 1);
+        
         write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
-        t_chadenn buffer = {'\0'};
+        
+        //Lenn al linenn
         lenn(cnx, &buffer);
-    }
+        
+        if(sscanf(buffer, KIR_KONEKTIN, identelezh, ger_kuz) == 2)
+        {
+            //Klask en diaz roadennoù evit kavout ur c'hemm 
+            //etre ar ger-tremen hag an anv implijer 
+            //evit mont e-barzh ar c'hlient.
+            const char *listenn_argemenn[1];
+            listenn_argemenn[0] = "jean";
+            listenn_argemenn[1] = "123!!";
+
+            PGresult *res = PQexecParams(
+                    conn, 
+                    "SELECT * FROM delivraptor.client WHERE identifiant = $1 AND mot_de_passe = $2",
+                    2,
+                    NULL,
+                    listenn_argemenn,
+                    NULL,
+                    NULL,
+                    0
+            );
+
+            int rows = PQntuples(res);
+            printf("%d\n", rows);
+            int cols = PQnfields(res);
+            for (int i = 0; i < cols; i++)
+            {
+                printf("%s\t", PQfname(res, i));
+            }
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    // Print the column value
+                    if (strcmp(PQgetvalue(res, i, j), "jean") == 0)
+                    {
+                        if (strcmp(PQgetvalue(res, i, j + 1), "123!!") == 0)
+                        {
+                            // Mettre authentification ici
+                            printf("LOGIN MDP OK");
+                            kenkas_reiz = true;
+                        }
+                    }
+                    printf("%s\t", PQgetvalue(res, i, j));
+                }
+                printf("\n");
+            }
+
+            ExecStatusType resStatus = PQresultStatus(res);
+            printf("Etat requete: %s\n", PQresStatus(resStatus));
+        
+
+        }
+        else{
+            write(cnx, GUDENN_LOG, strlen(GUDENN_LOG));
+        }
+    }while(!kenkas_reiz);
     return 0;
 }
 
@@ -190,18 +275,16 @@ int kemennadenn(int cnx, PGconn *conn)
     bool o_trein = true;
 
     t_chadenn buffer = {'\0'};
+    t_chadenn param = {'\0'};
 
-    t_listen argv;
-    int argc;
     skriv_kemennadenn(1, 1);
     do
     {
 
         // Reset propre des variables
         memset(buffer, 0, sizeof(buffer));
-        memset(argv, 0, sizeof(argv));
 
-        write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
+        write(cnx, KEMENADDENN_ENSKIRVET, strlen(KEMENADDENN_ENSKIRVET));
 
         /*lecture*/
         int taille = lenn(cnx, &buffer);
@@ -209,45 +292,37 @@ int kemennadenn(int cnx, PGconn *conn)
         /*MESSAGE DE L'UTILISATEUR*/
         skriv_kemennadenn(1, 3);
         skriv_kemennadenn(5, 1);
+
         printf("%*.*s", taille, taille, buffer);
 
-        argc = 0;
+        skriv_kemennadenn(1, 4);
 
-        char *token = strtok(buffer, " ");
-
-        while (token != NULL && argc < MAX_PARAMETROU)
+        // KROUIN UN BEAUREDAU NEVEZ
+        if(sscanf(buffer, KIR_ENROLAN, param) == 1)
         {
-            argv[argc++] = token;
-            token = strtok(NULL, " ");
+            t_chadenn_bordereau chadenn_bordereau;
+            stad_1(&chadenn_bordereau, param, conn);
+
+            // Digas ar Beauredeau d'an implijer
+            write(cnx, &chadenn_bordereau, strlen(chadenn_bordereau));
         }
-        if (argc != 0)
+        // TEST RESPONT
+        else if (strncmp(buffer, KIR_DEMAT, sizeof(KIR_DEMAT) - 1) == 0)
         {
-            skriv_kemennadenn(1, 4);
-
-            // KROUIN UN BEAUREDAU NEVEZ
-            if (strncmp(argv[0], KIR_ENROLAN, sizeof(KIR_ENROLAN) - 1) == 0)
-            {
-
-                t_chadenn_bordereau chadenn_bordereau;
-                stad_1(&chadenn_bordereau, argv[1], conn);
-
-                // Digas ar Beauredeau d'an implijer
-                write(cnx, chadenn_bordereau, strlen(chadenn_bordereau));
-            }
-            // TEST RESPONT
-            else if (strncmp(argv[0], DEMAT, sizeof(DEMAT) - 1) == 0)
-            {
-                write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
-            }
-            // VIT LAK FINN
-            else if (strncmp(argv[0], FINN_KOJEADENN, strlen(FINN_KOJEADENN) - 1) == 0)
-            {
-                o_trein = false;
-            }
-            else
-            {
-                write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));
-            }
+            write(cnx, DEMAT_RESPONT, strlen(DEMAT_RESPONT));
+        }
+        // VIT LAK FINN
+        else if (strncmp(buffer, KIR_FINN_KOJEADENN, strlen(KIR_FINN_KOJEADENN) - 1) == 0)
+        {
+            o_trein = false;
+        }
+        // STAD WAR-LEC'H
+        //else if (strncmp(argv[0], KIR_WAR_LECH, strlen(KIR_WAR_LECH) - 1){
+            
+        //}
+        else
+        {
+            write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));
         }
     } while (o_trein == true);
 
@@ -390,8 +465,7 @@ void lazhan_ur_bugel()
     waitpid(-1, NULL, WNOHANG);
     skriv_kemennadenn(1, 6);
 }
-
-int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id, PGconn *conn)
+int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn)
 {
     if (id != NULL)
     {
@@ -427,7 +501,7 @@ int stad_1(t_chadenn_bordereau *chadenn_bordereau, t_chadenn id, PGconn *conn)
     return -1;
 }
 
-int stad_2()
+int stad_war_lech()
 {
     return 0;
 }
