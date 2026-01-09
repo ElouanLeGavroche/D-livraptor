@@ -71,9 +71,7 @@ const char KIR_KONEKTIN[] = "CONN %s %s";
 // Krouiñ ur bordereau
 const char KIR_ENROLAN[] = "CREATE %253s";
 // Kaout Bordereau unann benak
-const char KIR_KAOUT[] = "GET";
-// Tremen d'ar stad goude
-const char KIR_WAR_LECH[] = "NEXT";
+const char KIR_KAOUT[] = "GET %s";
 
 // s2
 const char KIR_HED_KUIT[] = "s2";
@@ -316,10 +314,11 @@ int kemennadenn(int cnx, PGconn *conn)
         {
             o_trein = false;
         }
-        // STAD WAR-LEC'H
-        //else if (strncmp(argv[0], KIR_WAR_LECH, strlen(KIR_WAR_LECH) - 1){
+        // Gouzout pelec'h eo ur c'hommand
+        else if(sscanf(buffer, KIR_KAOUT, param) == 1)
+        {
             
-        //}
+        }
         else
         {
             write(cnx, GUDENN_RESPONT, strlen(GUDENN_RESPONT));

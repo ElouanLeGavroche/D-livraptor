@@ -2,35 +2,47 @@
 CREATE SCHEMA delivraptor;
 SET SCHEMA 'delivraptor';
 
-DROP TABLE IF EXISTS delivraptor.utilisateur, delivraptor.colis, delivraptor.liaison_colis_user;
+DROP TABLE IF EXISTS delivraptor.utilisateur, delivraptor.logs, delivraptor.client;
 CREATE TABLE delivraptor.utilisateur(
-    bordereau BIGINT NOT NULL UNIQUE PRIMARY KEY,
+    bordereau BIGINT UNIQUE NOT NULL,
     etape INT
 )
 
-CREATE TABLE delivraptor.colis(
-    id SERIAL PRIMARY KEY
-)
+CREATE TABLE delivraptor.logs(
+    id SERIAL PRIMARY KEY,
+    time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
+    id_utilisateur BIGINT UNIQUE NOT NULL,
+
+    CONSTRAINT fk_utilisateur_logs FOREIGN KEY (id_utilisateur)
+        REFERENCES delivraptor.utilisateur(bordereau)
+);
 CREATE TABLE client(
     identifiant VARCHAR(25) PRIMARY KEY,
     mot_de_passe VARCHAR(25)
-)
+);
 
-CREATE TABLE delivraptor.liaison_colis_user(
-    id_colis BIGINT NOT NULL,
-    id_utilisateur BIGINT NOT NULL,
+CREATE PROCEDURE increment_etape(id INT)
+AS $$
+BEGIN
+    UPDATE delivraptor.utilisateur
+    SET etape = etape + 1 WHERE id = delivraptor.bordereau;
 
-    CONSTRAINT fk_liasion_colis FOREIGN KEY (id_colis)
-        REFERENCES delivraptor.colis(id) ON DELETE CASCADE,
+    INSERT INTO delivraptor.logs (id_utilisateur)
+        VALUES (id);
+END;
+$$ LANGUAGE plpgsql;
 
-    CONSTRAINT fk_liaison_utilisateur FOREIGN KEY (id_utilisateur)
-        REFERENCES delivraptor.utilisateur(bordereau) ON DELETE CASCADE
+CREATE FUNCTION premier_log_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO delivraptor.logs (id_utilisateur)
+        VALUES (id);
+END;
+$$ LANGUAGE PLPGSQL;
 
-)
-
-INSERT INTO delivraptor.utilisateur (bordereau, etape) 
-    VALUES (452, '1');
+CREATE TRIGGER premier_log AFTER INSERT ON delivraptor.utilisateur 
+    FOR EACH ROW EXECUTE FUNCTION delivraptor.premier_log_func();
 
 INSERT INTO delivraptor.client (identifiant, mot_de_passe)
     VALUES 
@@ -38,7 +50,3 @@ INSERT INTO delivraptor.client (identifiant, mot_de_passe)
     ('Robert', '754?'),
     ('GupZoop', '45Ejkfsl'),
     ('Alizon', 'Super4');
-
-SELECT * FROM delivraptor.utilisateur;
-SELECT * FROM delivraptor.client 
-    WHERE identifiant = 'jean' AND mot_de_passe = '123!!'
