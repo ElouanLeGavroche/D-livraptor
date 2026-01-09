@@ -71,6 +71,34 @@ const char MU_CREE[] = "CREATE %253s";
 const char MU_RECUPERER[] = "GET %s";
 /****************************************** */
 
+// CPLS = Constante pour les logs serveur
+// TCPLS Tête Constante pour les logs serveur
+#define T_CPLS_SERVEUR_INFO 1
+    #define CPLS_ECHANGE_OUVERT 1
+    #define CPLS_INFORMATION_RECU 2
+    #define CPLS_LECTURE_DES_INFORMATIONS 3
+    #define CPLS_ENVOIE_DES_INFORMATIONS 4
+    #define CPLS_FIN_DE_LA_COMMUNICATION 5
+    #define CPLS_SOUS_PROCESSUS_TERMINER 6
+    #define CPLS_CONNEXION_CLIENT_EFFECTUER 7
+
+#define T_CPLS_SERVEUR_WARN 2
+    #define CPLS_PAS_DE_REPONSE 1
+    #define CPLS_REPONSE_LENTE 2
+    #define CPLS_COMMANDE_INCOMPRISE 3
+
+#define T_CPLS_SERVEUR_ERRO 3
+    #define CPLS_PROBLEME_CREATION_SOCKET 2
+    #define CPLS_PROBLEME_CONNEXION_AVEC_LA_BD 3
+
+#define T_CPLS_SERVEUR_INI 4
+    #define CPLS_CREATION_DE_LA_CONNEXION 1
+    #define CPLS_CREATION_DU_SOCKET 2
+    #define CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD 3
+    #define CPLS_CONNECTER_A_LA_BASE 4
+
+#define T_CPLS_MSG_CLIENT 5
+
 #define LONGUEUR_MSG 1024
 #define LONGUEUR_BORDEREAU 33
 
@@ -96,7 +124,7 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse);
 int main()
 {
     // Init du système de communication
-    message_console_serveur(4, 1);
+    message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
 
     int sock;
     int ret;
@@ -114,29 +142,30 @@ int main()
 
     sigaction(SIGCHLD, &act, NULL);
 
+    message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DU_SOCKET);
     sock = socket(AF_INET, SOCK_STREAM, 0);
-    message_console_serveur(4, 2);
 
+    int opt = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
+    {
+        message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CREATION_SOCKET);
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+    
     // connexion à la base de donnée
     PGconn *conn = PQconnectdb(
         "host=localhost port=5432 dbname=saedb user=sae password=racine");
 
     if (PQstatus(conn) != CONNECTION_OK)
     {
-        message_console_serveur(3, 1);
+        message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CONNEXION_AVEC_LA_BD);
         fprintf(stderr, ": %s\n", PQerrorMessage(conn));
         PQfinish(conn);
         return EXIT_FAILURE;
     }
     // connexion effectuer au serveur
-    message_console_serveur(4, 3);
-
-    int opt = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
-    {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
+    message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD);
 
     addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     addr.sin_family = AF_INET;
@@ -235,7 +264,7 @@ int connexion(int cnx, PGconn *conn)
     t_chaine identifiant;
     t_chaine mot_de_passe;
 
-    message_console_serveur(1, 1);
+    message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ECHANGE_OUVERT);
 
     write(cnx, MESSAGE_BIENVENUE, strlen(MESSAGE_BIENVENUE));
 
@@ -279,7 +308,7 @@ int connexion(int cnx, PGconn *conn)
                         if (strcmp(PQgetvalue(res, i, j + 1), mot_de_passe) == 0)
                         {
                             // Connexion effectuer
-                            message_console_serveur(1, 7);
+                            message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_CONNEXION_CLIENT_EFFECTUER);
                             write(cnx, RS_CONNECTER, strlen(RS_CONNECTER));
                             demande_correcte = true;
                         }
@@ -316,8 +345,6 @@ int kemennadenn(int cnx, PGconn *conn)
     t_chaine param = {'\0'};
 
     t_chaine reponse = {'\0'};
-
-    message_console_serveur(1, 1);
     do
     {
 
@@ -327,15 +354,15 @@ int kemennadenn(int cnx, PGconn *conn)
         write(cnx, MESSAGE_CONNECTER, strlen(MESSAGE_CONNECTER));
 
         /*lecture*/
+        message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_LECTURE_DES_INFORMATIONS);
         int taille = lire(cnx, &buffer);
 
         /*MESSAGE DE L'UTILISATEUR*/
-        message_console_serveur(1, 3);
-        message_console_serveur(5, 1);
+        message_console_serveur(T_CPLS_MSG_CLIENT, 0);
 
         printf("%*.*s", taille, taille, buffer);
 
-        message_console_serveur(1, 4);
+        message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ENVOIE_DES_INFORMATIONS);
 
         // Crée un nouveau bordereau
         if (sscanf(buffer, MU_CREE, param) == 1)
@@ -366,11 +393,12 @@ int kemennadenn(int cnx, PGconn *conn)
         // Message par défaut qui prévient d'une erreur dans la saisie de la commande
         else
         {
+            message_console_serveur(T_CPLS_SERVEUR_WARN, CPLS_COMMANDE_INCOMPRISE);
             write(cnx, RS_MAUVAISE_COMMANDE, strlen(RS_MAUVAISE_COMMANDE));
         }
     } while (en_fonctionnement == true);
 
-    message_console_serveur(1, 5);
+    message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_FIN_DE_LA_COMMUNICATION);
     return EXIT_SUCCESS;
 }
 
@@ -417,43 +445,47 @@ void message_console_serveur(int type, int msg)
         switch (msg)
         {
         case 1:
-            printf("kevreadenn graet\n");
+            printf("Échange ouvert\n");
             break;
 
         case 2:
-            printf("keloù resevet\n");
+            printf("Information reçu\n");
             break;
 
         case 3:
-            printf("lennidigezh ar c'heloù\n");
+            printf("Lecture des information\n");
             break;
 
         case 4:
-            printf("digas keloioù\n");
+            printf("Envoie des informations\n");
             break;
 
         case 5:
-            printf("finn ar kojeadenn\n");
+            printf("Fin de la communication\n");
             break;
 
         case 6:
-            printf("bugel lazhet\n");
+            printf("Sous processus terminer\n");
             break;
         case 7:
-            printf("anavezadenn graet\n");
+            printf("Connexion cliente faite\n");
             break;
 
         default:
-            printf("[DIDERMEN]\n");
+            printf("[Inconnu]\n");
             break;
         }
         break;
 
     // MA ZO GUDENNOÙ GANT AR SERVER
     case 2:
-        printf("[SERVER GUDEN] ");
+        printf("[SERVER WARN] ");
         switch (msg)
         {
+        case 3:
+            printf("Entrer non comprise\n");
+            break;
+
         default:
             printf("netra vit poent\n");
             break;
@@ -462,11 +494,14 @@ void message_console_serveur(int type, int msg)
 
     // MA ZO GUDENNOÙ GANT AR C'HOD
     case 3:
-        printf("[SERVER FAZI] ");
+        printf("[SERVER ERR] ");
         switch (msg)
         {
+        case 2:
+            printf("Problème avec la création du socket : ");
+            break;
         case 3:
-            printf("gudenn kevreadenn gant ar BDD : ");
+            printf("Problème de connexion avec la bd : ");
             break;
         default:
             printf("netra vit poent\n");
@@ -480,15 +515,15 @@ void message_console_serveur(int type, int msg)
         switch (msg)
         {
         case 1:
-            printf("Krouidigezh an dalc'h.\n");
+            printf("Création de la connexion.\n");
             break;
 
         case 2:
-            printf("Krouidigezh ar soket.\n");
+            printf("Création du soket.\n");
             break;
 
         case 3:
-            printf("Kevreadenn gant ar BDD graet. \n");
+            printf("Connexion avec la base de donnée. \n");
             break;
 
         default:
@@ -498,7 +533,7 @@ void message_console_serveur(int type, int msg)
         break;
 
     case 5:
-        printf("[KEMENNADER AN IMPLIJER]");
+        printf("[MESSAGE UTILISATEUR]");
         break;
 
     // VIT AR C'HELLOIOÙ NAN KOMPRENET
@@ -521,7 +556,7 @@ void message_console_serveur(int type, int msg)
 void tuer_sous_processus()
 {
     waitpid(-1, NULL, WNOHANG);
-    message_console_serveur(1, 6);
+    message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_SOUS_PROCESSUS_TERMINER);
 }
 
 /**
@@ -596,7 +631,7 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
         NULL,
         NULL,
         0);
-        
+
     int rows = PQntuples(res);
     int cols = PQnfields(res);
 
