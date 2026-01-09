@@ -48,15 +48,8 @@ int kemennadenn(int cnx, PGconn *conn);
     = 0 peptra zo mat
     = -1 fazi
 */
-int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn);
-int stad_2();
-int stad_3();
-int stad_4();
-int stad_5();
-int stad_6();
-int stad_7();
-int stad_8();
-int stad_9();
+int krouin_bordereau(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn);
+int kaout_implijer_stad(t_chadenn *bordereau, PGconn *conn, t_chadenn *respont);
 
 
 // Test
@@ -258,13 +251,17 @@ int enskrivadur(int cnx, PGconn *conn)
 
             ExecStatusType resStatus = PQresultStatus(res);
             printf("Etat requete: %s\n", PQresStatus(resStatus));
-        
+            
+            if(kenkas_reiz){
+                PQclear(res);
+            }
 
         }
         else{
             write(cnx, GUDENN_LOG, strlen(GUDENN_LOG));
         }
     }while(!kenkas_reiz);
+
     return 0;
 }
 
@@ -274,6 +271,7 @@ int kemennadenn(int cnx, PGconn *conn)
 
     t_chadenn buffer = {'\0'};
     t_chadenn param = {'\0'};
+    t_chadenn respont = {'\0'};
 
     skriv_kemennadenn(1, 1);
     do
@@ -299,7 +297,7 @@ int kemennadenn(int cnx, PGconn *conn)
         if(sscanf(buffer, KIR_ENROLAN, param) == 1)
         {
             t_chadenn_bordereau chadenn_bordereau;
-            stad_1(&chadenn_bordereau, param, conn);
+            krouin_bordereau(&chadenn_bordereau, param, conn);
 
             // Digas ar Beauredeau d'an implijer
             write(cnx, &chadenn_bordereau, strlen(chadenn_bordereau));
@@ -317,7 +315,9 @@ int kemennadenn(int cnx, PGconn *conn)
         // Gouzout pelec'h eo ur c'hommand
         else if(sscanf(buffer, KIR_KAOUT, param) == 1)
         {
-            kaout_implijer_stad(&param);
+            
+            kaout_implijer_stad(&param, conn, &respont);
+            write(cnx, &respont, strlen(respont));
         }
         else
         {
@@ -464,7 +464,7 @@ void lazhan_ur_bugel()
     waitpid(-1, NULL, WNOHANG);
     skriv_kemennadenn(1, 6);
 }
-int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn)
+int krouin_bordereau(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn)
 {
     if (id != NULL)
     {
@@ -500,8 +500,33 @@ int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn)
     return -1;
 }
 
-int kaout_implijer_stad(t_chadenn id)
+int kaout_implijer_stad(t_chadenn *bordereau, PGconn *conn, t_chadenn *respont)
 {
-    printf("%d", id);
+
+    const char *listenn_argemenn[1];
+    listenn_argemenn[0] = *bordereau;
+
+    PGresult *res = PQexecParams(conn, 
+        "SELECT bordereau, etape, time FROM delivraptor.utilisateur AS u INNER JOIN delivraptor.logs AS l ON bordereau = id_utilisateur WHERE  bordereau = $1; ",
+        1,
+        NULL,
+        listenn_argemenn,
+        NULL,
+        NULL,
+        0
+    );
+    int rows = PQntuples(res);
+    int cols = PQnfields(res);
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            strcat(*respont, PQgetvalue(res, i, j));
+            strcat(*respont, " | ");
+        }
+    }
+    strcat(*respont, "\n");
+
     return 0;
 }

@@ -22,26 +22,29 @@ CREATE TABLE client(
     mot_de_passe VARCHAR(25)
 );
 
-CREATE PROCEDURE increment_etape(id INT)
+CREATE OR REPLACE bordereauPROCEDURE increment_etape(id BIGINT)
 AS $$
 BEGIN
     UPDATE delivraptor.utilisateur
-    SET etape = etape + 1 WHERE id = delivraptor.bordereau;
+    SET etape = etape + 1 WHERE bordereau = id;
 
     INSERT INTO delivraptor.logs (id_utilisateur)
         VALUES (id);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE FUNCTION premier_log_func()
+CREATE OR REPLACE FUNCTION delivraptor.premier_log_func()
 RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO delivraptor.logs (id_utilisateur)
-        VALUES (id);
-END;
-$$ LANGUAGE PLPGSQL;
+    VALUES (NEW.bordereau);
 
-CREATE TRIGGER premier_log AFTER INSERT ON delivraptor.utilisateur 
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE TRIGGER premier_log AFTER INSERT ON delivraptor.utilisateur 
     FOR EACH ROW EXECUTE FUNCTION delivraptor.premier_log_func();
 
 INSERT INTO delivraptor.client (identifiant, mot_de_passe)
