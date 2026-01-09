@@ -317,7 +317,7 @@ int kemennadenn(int cnx, PGconn *conn)
         // Gouzout pelec'h eo ur c'hommand
         else if(sscanf(buffer, KIR_KAOUT, param) == 1)
         {
-            
+            kaout_implijer_stad(&param);
         }
         else
         {
@@ -500,7 +500,8 @@ int stad_1(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn)
     return -1;
 }
 
-int stad_war_lech()
+int kaout_implijer_stad(t_chadenn id)
 {
+    printf("%d", id);
     return 0;
 }
