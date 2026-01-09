@@ -28,8 +28,9 @@
 // RESPONT AR SERVER
 #define DEMAT_RESPONT "demat implijer\n"
 #define GUDENN_RESPONT "eur fazhi zo, barzh o komand\n"
-#define GUDENN_LOG "fazi gant an identelezh, c'huited\n"
-#define NIVEREN_RESPONT "niveren : "
+
+#define GUDENN_LOG "fazi\n"
+#define ANAVEZADENN_GRAET "graet\n"
 
 #define HIRDER_KEMENNADENN 1024
 #define HIRDER_CHADENN_BORDEREAU 33
@@ -50,7 +51,6 @@ int kemennadenn(int cnx, PGconn *conn);
 */
 int krouin_bordereau(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *conn);
 int kaout_implijer_stad(t_chadenn *bordereau, PGconn *conn, t_chadenn *respont);
-
 
 // Test
 const char KIR_DEMAT[] = "DEMAT";
@@ -122,12 +122,14 @@ int main()
     size = sizeof(conn_addr);
 
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
-    if(ret == -1){
+    if (ret == -1)
+    {
         return EXIT_FAILURE;
     }
 
     ret = listen(sock, 1);
-    if(ret == -1){
+    if (ret == -1)
+    {
         return EXIT_FAILURE;
     }
 
@@ -142,7 +144,7 @@ int main()
             // Ma ez eo ur bugel, mont barzh ha ac'hwel vit ober war dro ar kom
             enskrivadur(cnx, conn);
             kemennadenn(cnx, conn);
-            
+
             shutdown(cnx, SHUT_RDWR);
             close(cnx);
             _exit(0);
@@ -170,97 +172,98 @@ int lenn(int cnx, t_chadenn *buffer)
     int dalch = 0;
     char c = '\0';
 
-    //lagadenn vit lenn
-    while (dalch < HIRDER_KEMENNADENN - 1 && c != '\n') {
+    // lagadenn vit lenn
+    while (dalch < HIRDER_KEMENNADENN - 1 && c != '\n')
+    {
         ssize_t n = read(cnx, &c, 1);
-        if (n <= 0) {return -1;}
+        if (n <= 0)
+        {
+            return -1;
+        }
 
-        //Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
+        // Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
         (*buffer)[dalch++] = c;
     }
 
-    //Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
+    // Vit kaout petra zo barzh a cellulenn 1 ha ket ar pointeur
     (*buffer)[dalch] = '\0';
     return dalch;
 }
 
-
 int enskrivadur(int cnx, PGconn *conn)
 {
-    //Buffer vit kemenadenn an implijer
+    // Buffer vit kemenadenn an implijer
     t_chadenn buffer = {'\0'};
     t_chadenn identelezh;
     t_chadenn ger_kuz;
 
     bool kenkas_reiz = false;
-
-    do{
-        skriv_kemennadenn(1, 1);
-        
-        write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
-        
-        //Lenn al linenn
-        lenn(cnx, &buffer);
-        
-        if(sscanf(buffer, KIR_KONEKTIN, identelezh, ger_kuz) == 2)
+    skriv_kemennadenn(1, 1);
+    bool kentan = true;
+    do
+    {
+        if(kentan == false)
         {
-            //Klask en diaz roadennoù evit kavout ur c'hemm 
-            //etre ar ger-tremen hag an anv implijer 
-            //evit mont e-barzh ar c'hlient.
+            write(cnx, GUDENN_LOG, strlen(GUDENN_LOG));
+        }
+
+        write(cnx, KEMENNADENN_DEGEMER, strlen(KEMENNADENN_DEGEMER));
+        kentan = false;
+
+        // Lenn al linenn
+        lenn(cnx, &buffer);
+
+        if (sscanf(buffer, KIR_KONEKTIN, identelezh, ger_kuz) == 2)
+        {
+            // Klask en diaz roadennoù evit kavout ur c'hemm
+            // etre ar ger-tremen hag an anv implijer
+            // evit mont e-barzh ar c'hlient.
             const char *listenn_argemenn[1];
-            listenn_argemenn[0] = "jean";
-            listenn_argemenn[1] = "123!!";
+            listenn_argemenn[0] = identelezh;
+            listenn_argemenn[1] = ger_kuz;
 
             PGresult *res = PQexecParams(
-                    conn, 
-                    "SELECT * FROM delivraptor.client WHERE identifiant = $1 AND mot_de_passe = $2",
-                    2,
-                    NULL,
-                    listenn_argemenn,
-                    NULL,
-                    NULL,
-                    0
+                conn,
+                "SELECT * FROM delivraptor.client WHERE identifiant = $1 AND mot_de_passe = $2",
+                2,
+                NULL,
+                listenn_argemenn,
+                NULL,
+                NULL,
+                0
             );
 
             int rows = PQntuples(res);
-            printf("%d\n", rows);
             int cols = PQnfields(res);
-            for (int i = 0; i < cols; i++)
-            {
-                printf("%s\t", PQfname(res, i));
-            }
 
-            for (int i = 0; i < rows; i++)
+            if (rows > 0)
             {
-                for (int j = 0; j < cols; j++)
+                for (int i = 0; i < rows; i++)
                 {
-                    // Print the column value
-                    if (strcmp(PQgetvalue(res, i, j), "jean") == 0)
+                    for (int j = 0; j < cols; j++)
                     {
-                        if (strcmp(PQgetvalue(res, i, j + 1), "123!!") == 0)
+                        // Print the column value
+                        if (strcmp(PQgetvalue(res, i, j), identelezh) == 0)
                         {
-                            // Mettre authentification ici
-                            printf("LOGIN MDP OK");
-                            kenkas_reiz = true;
+                            if (strcmp(PQgetvalue(res, i, j + 1), ger_kuz) == 0)
+                            {
+                                // Mettre authentification ici
+                                skriv_kemennadenn(1, 7);
+                                write(cnx, ANAVEZADENN_GRAET, strlen(ANAVEZADENN_GRAET));
+                                kenkas_reiz = true;
+                            }
                         }
                     }
-                    printf("%s\t", PQgetvalue(res, i, j));
                 }
-                printf("\n");
             }
 
-            ExecStatusType resStatus = PQresultStatus(res);
-            printf("Etat requete: %s\n", PQresStatus(resStatus));
-            
-            if(kenkas_reiz){
+            if (kenkas_reiz)
+            {
                 PQclear(res);
             }
+        }
 
-        }
-        else{
-            write(cnx, GUDENN_LOG, strlen(GUDENN_LOG));
-        }
-    }while(!kenkas_reiz);
+    } while (!kenkas_reiz);
 
     return 0;
 }
@@ -294,7 +297,7 @@ int kemennadenn(int cnx, PGconn *conn)
         skriv_kemennadenn(1, 4);
 
         // KROUIN UN BEAUREDAU NEVEZ
-        if(sscanf(buffer, KIR_ENROLAN, param) == 1)
+        if (sscanf(buffer, KIR_ENROLAN, param) == 1)
         {
             t_chadenn_bordereau chadenn_bordereau;
             krouin_bordereau(&chadenn_bordereau, param, conn);
@@ -313,9 +316,9 @@ int kemennadenn(int cnx, PGconn *conn)
             o_trein = false;
         }
         // Gouzout pelec'h eo ur c'hommand
-        else if(sscanf(buffer, KIR_KAOUT, param) == 1)
+        else if (sscanf(buffer, KIR_KAOUT, param) == 1)
         {
-            
+
             kaout_implijer_stad(&param, conn, &respont);
             write(cnx, &respont, strlen(respont));
         }
@@ -339,6 +342,7 @@ void skriv_kemennadenn(int seurt, int kemennadenn)
             1.4 digas keloioù
             1.5 finn ar kojeadenn
             1.6 bugel lazhet
+            1.7 anavezadenn graet
 
         2 [SERVER DIWAL]
             2.1 respont ebet
@@ -386,6 +390,9 @@ void skriv_kemennadenn(int seurt, int kemennadenn)
 
         case 6:
             printf("bugel lazhet\n");
+            break;
+        case 7:
+            printf("anavezadenn graet\n");
             break;
 
         default:
@@ -479,15 +486,15 @@ int krouin_bordereau(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *c
         strftime(bordereau, sizeof(bordereau), "%H%M%S", t); // Kaout an amzer barzh ur chadenn
         strcat(bordereau, id);                               // Lakaat id ar produce warlec'h
         strcpy(*chadenn_bordereau, bordereau);               // Lakaat tout ze barzh an argemmenn
-        
+
         char etape_str[HIRDER_CHADENN_BORDEREAU];
         snprintf(etape_str, sizeof etape_str, "%s", bordereau);
 
         const char *listenn_argemenn[1];
         listenn_argemenn[0] = bordereau;
 
-        PQexecParams(conn, 
-                    "INSERT INTO delivraptor.utilisateur (bordereau, etape) VALUES ($1, 1)",
+        PQexecParams(conn,
+                     "INSERT INTO delivraptor.utilisateur (bordereau, etape) VALUES ($1, 1)",
                      1,
                      NULL,
                      listenn_argemenn,
@@ -495,7 +502,6 @@ int krouin_bordereau(t_chadenn_bordereau *chadenn_bordereau, char *id, PGconn *c
                      NULL,
                      0);
         return 0;
-    
     }
     return -1;
 }
@@ -506,15 +512,14 @@ int kaout_implijer_stad(t_chadenn *bordereau, PGconn *conn, t_chadenn *respont)
     const char *listenn_argemenn[1];
     listenn_argemenn[0] = *bordereau;
 
-    PGresult *res = PQexecParams(conn, 
-        "SELECT bordereau, etape, time FROM delivraptor.utilisateur AS u INNER JOIN delivraptor.logs AS l ON bordereau = id_utilisateur WHERE  bordereau = $1; ",
-        1,
-        NULL,
-        listenn_argemenn,
-        NULL,
-        NULL,
-        0
-    );
+    PGresult *res = PQexecParams(conn,
+                                 "SELECT bordereau, etape, time FROM delivraptor.utilisateur AS u INNER JOIN delivraptor.logs AS l ON bordereau = id_utilisateur WHERE  bordereau = $1; ",
+                                 1,
+                                 NULL,
+                                 listenn_argemenn,
+                                 NULL,
+                                 NULL,
+                                 0);
     int rows = PQntuples(res);
     int cols = PQnfields(res);
 
