@@ -32,45 +32,6 @@
 #include <regex.h>
 #include <libpq-fe.h>
 
-// RS = Réponse serveur
-/***************************************** */
-// réponse du serveur après le bonjour
-#define RS_BONJOUR "Bonjour utilisateur\n"
-
-// réponse du serveur lorsqu'il reçoit une commande inconnu ou éronée
-#define RS_MAUVAISE_COMMANDE "commande erronée\n"
-
-// réponse du serveur si le login ou mdp du client est mauvais
-#define RS_MAUVAIS_LOG "erreur\n"
-
-// réponse du serveur après qu'une connexion ce soit bien passé
-#define RS_CONNECTER "fait\n"
-
-// symbole d'entré avant connexion
-#define MESSAGE_BIENVENUE "-> : "
-
-// symbole d'entré apreès connexion
-#define MESSAGE_CONNECTER "Service -> :"
-/***************************************** */
-
-// MU = message utilisateur
-/***************************************** */
-// message pour tester la comm
-const char MU_BONJOUR[] = "BONJOUR";
-
-// message de fin de comm
-const char MU_FIN_COMMUNICATION[] = "FIN";
-
-// message de demande de connexion
-const char MU_CONNEXION[] = "CONN %s %s";
-
-// message de demande de création de bordereau
-const char MU_CREE[] = "CREATE %253s";
-
-// message de demande de récupération d'état d'un user
-const char MU_RECUPERER[] = "GET %s";
-/****************************************** */
-
 // CPLS = Constante pour les logs serveur
 // TCPLS Tête Constante pour les logs serveur
 #define T_CPLS_SERVEUR_INFO 1
@@ -102,20 +63,90 @@ const char MU_RECUPERER[] = "GET %s";
 #define LONGUEUR_MSG 1024
 #define LONGUEUR_BORDEREAU 33
 
+#define MAX_LIVREUR 2
+#define MD5_SIZE 33
+
+// code retour
+/***************************************** */
+// Tout c'est passé correctement
+#define DONE 0
+
+// Une erreur est survenue
+#define ERROR -1
+
+// La file des livreur est pleine
+#define LIVREUR_FULL 1
+
+// RS = Réponse serveur
+/***************************************** */
+// réponse du serveur après le bonjour
+#define RS_BONJOUR "HELLO_USER\n"
+
+// réponse du serveur lorsqu'il reçoit une commande inconnu ou éronée
+#define RS_MAUVAISE_COMMANDE "BAD_COMMAND\n"
+
+// réponse du serveur si le login ou mdp du client est mauvais
+#define RS_ERROR "ERROR\n"
+
+// réponse du serveur après qu'une connexion ce soit bien passé
+#define RS_CONNECTER "DONE\n"
+
+// symbole d'entré avant connexion
+#define RS_MESSAGE_BIENVENUE "-> : "
+
+// symbole d'entré apreès connexion
+#define RS_MESSAGE_CONNECTER "Service -> :"
+
+// réponse s'il n'y a plus de livreur dispo
+#define RS_LIVREUR_MAX "FULL\n"
+/***************************************** */
+
+// MU = message utilisateur
+/***************************************** */
+// message pour tester la comm
+const char MU_BONJOUR[] = "BONJOUR";
+
+// message de fin de comm
+const char MU_FIN_COMMUNICATION[] = "FIN";
+
+// message de demande de connexion
+const char MU_CONNEXION[] = "CONN %s %s";
+
+// message de demande de création de bordereau
+const char MU_CREE[] = "CREATE %253s";
+
+// message de demande de récupération d'état d'un user
+const char MU_RECUPERER[] = "GET %s";
+
+// message quelquonque
+const char MU_QUELQUONQUE[] = "%s %s";
+
+// option d'aide
+const char MU_HELP[] = "--help";
+/****************************************** */
+
+// MDLS = message de la simulation
+/***************************************** */
+const char MDLS_NEXT_STEP[] = "NEXT"; 
+
 // type pour la chaine du bordereau
 typedef char t_chaine_bordereau[LONGUEUR_BORDEREAU];
 // type pour les chaine lié au entré de l'utilisateur
 typedef char t_chaine[LONGUEUR_MSG];
 
-void message_console_serveur(int type, int kemennadenn);
+void message_console_serveur(int type, int msg);
 void tuer_sous_processus();
+void help_panel(t_chaine *buffer);
+void passer_temps(PGconn *conn);
 
 int lire(int cnx, t_chaine *buffer);
 int connexion(int cnx, PGconn *conn);
-int kemennadenn(int cnx, PGconn *conn);
+int gestion_des_message(int cnx, PGconn *conn);
 
 int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn);
 int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse);
+
+
 
 /**
  * @fn int main()
@@ -196,14 +227,10 @@ int main()
             // La variable peux retourner -1 si la connexion
             // à été annulé ou refuser pour x raison
             // dans la fonction de connexion
-            int continuer;
-
-            continuer = connexion(cnx, conn);
-            if (continuer == 0)
+            if (connexion(cnx, conn) == true)
             {
-                kemennadenn(cnx, conn);
+                gestion_des_message(cnx, conn);
             }
-
             shutdown(cnx, SHUT_RDWR);
             close(cnx);
             _exit(0);
@@ -258,27 +285,20 @@ int connexion(int cnx, PGconn *conn)
     PGresult *res;
     // C'est cette variable qui sera mis à jour si la demande de connexion est accepter ou non
     bool demande_correcte = false;
-    // Si la connexion échoue, il doit prendre la valeur de -1, pour ne pas mettre suite à la communication
-    int etat_retour = 0;
 
     t_chaine identifiant;
     t_chaine mot_de_passe;
 
     message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ECHANGE_OUVERT);
 
-    write(cnx, MESSAGE_BIENVENUE, strlen(MESSAGE_BIENVENUE));
+    write(cnx, RS_MESSAGE_BIENVENUE, strlen(RS_MESSAGE_BIENVENUE));
 
     // lire la ligne
     lire(cnx, &buffer);
 
-    if (strncmp(buffer, MU_FIN_COMMUNICATION, strlen(MU_FIN_COMMUNICATION) - 1) == 0)
+    if (sscanf(buffer, MU_CONNEXION, identifiant, mot_de_passe) == 2)
     {
-        // SI la connexion est fermer avant
-        demande_correcte = true;
-        etat_retour = -1;
-    }
-    else if (sscanf(buffer, MU_CONNEXION, identifiant, mot_de_passe) == 2)
-    {
+        printf("Je rentre ici \n");
         // Liste des arguments qui seront rentré dans la requête
         const char *listenn_argemenn[2] = {identifiant, mot_de_passe};
 
@@ -292,50 +312,29 @@ int connexion(int cnx, PGconn *conn)
             NULL,
             0);
 
-        int rows = PQntuples(res);
-        int cols = PQnfields(res);
         
-        //Lecture et analyse de ce qu'à retourner la commande
-        if (rows > 0)
-        {
-            for (int i = 0; i < rows; i++)
-            {
-                for (int j = 0; j < cols; j++)
-                {
-                    // Print the column value
-                    if (strcmp(PQgetvalue(res, i, j), identifiant) == 0)
-                    {
-                        if (strcmp(PQgetvalue(res, i, j + 1), mot_de_passe) == 0)
-                        {
-                            // Connexion effectuer
-                            message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_CONNEXION_CLIENT_EFFECTUER);
-                            write(cnx, RS_CONNECTER, strlen(RS_CONNECTER));
-                            demande_correcte = true;
-                        }
-                    }
-                }
-            }
+        if(PQntuples(res) == 1){
+            demande_correcte = true;
         }
-    }
-    if (!demande_correcte)
-    {
-        write(cnx, RS_MAUVAIS_LOG, strlen(RS_MAUVAIS_LOG));
-        etat_retour = -1;
+        PQclear(res);
     }
 
+    if (!demande_correcte)
+    {
+        write(cnx, RS_ERROR, strlen(RS_ERROR));
+    }
     //Fermer la connexion
-    PQclear(res);
-    return etat_retour;
+    return demande_correcte;
 }
 
 
 /**
- * @fn int kemennadenn(int cnx, PGconn *conn)
+ * @fn int gestion_des_message(int cnx, PGconn *conn)
  * @brief Cette fonction gère les échange entre le serveur et le client. Il interprête, et est le point central.
  * @param cnx connexion du socket
  * @param conn connexion à la base de donnée
  */
-int kemennadenn(int cnx, PGconn *conn)
+int gestion_des_message(int cnx, PGconn *conn)
 {
     bool en_fonctionnement = true;
 
@@ -343,15 +342,20 @@ int kemennadenn(int cnx, PGconn *conn)
     t_chaine buffer = {'\0'};
     // Valeur du paramètre rentré dans une commande
     t_chaine param = {'\0'};
-
+    // Réponse du serveur à l'utilisateur
     t_chaine reponse = {'\0'};
+    // Commande quelquonque
+    t_chaine quelquonque = {'\0'};
+    // Resultat des fonctions
+    int res;
+    
     do
     {
 
         // Reset propre des variables
         memset(buffer, 0, sizeof(buffer));
 
-        write(cnx, MESSAGE_CONNECTER, strlen(MESSAGE_CONNECTER));
+        write(cnx, RS_MESSAGE_CONNECTER, strlen(RS_MESSAGE_CONNECTER));
 
         /*lecture*/
         message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_LECTURE_DES_INFORMATIONS);
@@ -364,17 +368,38 @@ int kemennadenn(int cnx, PGconn *conn)
 
         message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ENVOIE_DES_INFORMATIONS);
 
+        
+        // Voir s'il s'agit d'un help
+        if(sscanf(buffer, MU_QUELQUONQUE, quelquonque ,param) == 2 && strncmp(param, MU_HELP, sizeof(MU_HELP)) == 0)
+        {
+            help_panel(&quelquonque);
+        }
         // Crée un nouveau bordereau
-        if (sscanf(buffer, MU_CREE, param) == 1)
+        else if (sscanf(buffer, MU_CREE, param) == 1)
         {
             t_chaine_bordereau bordereau;
-            cree_bordereau(&bordereau, param, conn);
+            res = cree_bordereau(&bordereau, param, conn);
 
-            // Envoyer à l'utilisateur son bordereau
-            write(cnx, &bordereau, strlen(bordereau));
+            if(res == ERROR){
+                write(cnx, RS_ERROR, strlen(RS_ERROR));
+            }
+            else if(res == LIVREUR_FULL){
+                write(cnx, RS_LIVREUR_MAX, strlen(RS_LIVREUR_MAX));
+            }
+            else if(res == DONE){
+                // Envoyer à l'utilisateur son bordereau
+                write(cnx, &bordereau, strlen(bordereau));
+            }
+        }            
+        // Donner le suivit d'une commande donnée
+        else if (sscanf(buffer, MU_RECUPERER, param) == 1)
+        {
+
+            get_etat_utilisateur(&param, conn, &reponse);
+            write(cnx, &reponse, strlen(reponse));
         }
         // Hello Serveur si on veux...
-        else if (strncmp(buffer, MU_BONJOUR, sizeof(MU_BONJOUR) - 1) == 0)
+        else if (strncmp(buffer, MU_BONJOUR, strlen(MU_BONJOUR) - 1) == 0)
         {
             write(cnx, RS_BONJOUR, strlen(RS_BONJOUR));
         }
@@ -383,12 +408,9 @@ int kemennadenn(int cnx, PGconn *conn)
         {
             en_fonctionnement = false;
         }
-        // Donner le suivit d'une commande donnée
-        else if (sscanf(buffer, MU_RECUPERER, param) == 1)
-        {
-
-            get_etat_utilisateur(&param, conn, &reponse);
-            write(cnx, &reponse, strlen(reponse));
+        // FAIRE PASSER LE TEMPS,  CMD RESERVER AU SIMULATEUR
+        else if(strncmp(buffer, MDLS_NEXT_STEP, strlen(MDLS_NEXT_STEP) -1) == 0){
+            passer_temps(conn);
         }
         // Message par défaut qui prévient d'une erreur dans la saisie de la commande
         else
@@ -396,6 +418,7 @@ int kemennadenn(int cnx, PGconn *conn)
             message_console_serveur(T_CPLS_SERVEUR_WARN, CPLS_COMMANDE_INCOMPRISE);
             write(cnx, RS_MAUVAISE_COMMANDE, strlen(RS_MAUVAISE_COMMANDE));
         }
+
     } while (en_fonctionnement == true);
 
     message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_FIN_DE_LA_COMMUNICATION);
@@ -410,32 +433,6 @@ int kemennadenn(int cnx, PGconn *conn)
  */
 void message_console_serveur(int type, int msg)
 {
-    /*
-        1 [SERVER INFO]
-            1.1 kevreadenn graet
-            1.2 keloù resevet
-            1.3 lennidigezh ar c'heloù
-            1.4 digas keloioù
-            1.5 finn ar kojeadenn
-            1.6 bugel lazhet
-            1.7 anavezadenn graet
-
-        2 [SERVER DIWAL]
-            2.1 reponse ebet
-            2.2 reponse hir
-            2.3 arouezenn nan komprenet
-
-        3 [SERVER GUDENN]
-            3.3 gudenn kevreadenn gant ar BDD
-
-        4 [SERVER INIT]
-            4.1 Krouidigezh an dalc'h
-            4.2 Krouidigezh ar soket
-            4.3 Kevreadenn gant ar BDD graet
-        5 [KEMENNADER AN IMPLIJER]
-            5.1
-    */
-
     switch (type)
     {
     case 1:
@@ -570,7 +567,19 @@ void tuer_sous_processus()
  */
 int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
 {
-    if (id != NULL)
+    
+    PGresult *res = PQexec(
+        conn,
+        "SELECT count(*) FROM delivraptor.utilisateur WHERE etape <= 3"
+    );
+
+    t_chaine nb_element_etape = {'\0'};
+    strcpy(nb_element_etape, PQgetvalue(res, 0, 0));
+    int nb_elt = atoi(PQgetvalue(res, 0, 0));
+    if (nb_elt >= MAX_LIVREUR){
+        return LIVREUR_FULL;
+    }
+    else if (id != NULL)
     {
         // Avoir le temps
         time_t now = time(NULL);
@@ -604,9 +613,9 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
                      NULL,
                      NULL,
                      0);
-        return 0;
+        return DONE;
     }
-    return -1;
+    return ERROR;
 }
 
 
@@ -634,6 +643,10 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
 
     int rows = PQntuples(res);
     int cols = PQnfields(res);
+    
+    if (rows == 0){
+        return ERROR;
+    }
 
     for (int i = 0; i < rows; i++)
     {
@@ -645,5 +658,39 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
     }
     strcat(*reponse, "\n");
 
+    return DONE;
+}
+
+/**
+ * @fn help_panel(t_chaine *buffer)
+ * @brief sert à expliquer les commande du programe
+ * @param buffer pour savoir de quel commade il s'agit
+ */
+void help_panel(t_chaine *buffer){
+    printf("%s", *buffer);
+}
+
+/**
+ * @fn livrer_refuser(int cnx)
+ * @brief fait passer le temps
+ * @param cnx connexion du socket
+ */
+int livrer_refuser(int cnx){
+    //ETAPE 1 : livraison accepter / refuser
+
+    //ETAPE 2 : absent / présent
+
     return 0;
+}
+
+/**
+ * @fn passer_temps(PGconn *conn)
+ * @brief fait passer le temps
+ * @param conn Pour mettre à jour la base de donnée
+ */
+void passer_temps(PGconn *conn){
+    PQexec(
+        conn,
+        "UPDATE delivraptor.utilisateur SET etape = etape + 1 WHERE etape < 9"
+    );
 }

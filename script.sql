@@ -22,17 +22,6 @@ CREATE TABLE client(
     mot_de_passe VARCHAR(25)
 );
 
-CREATE OR REPLACE bordereauPROCEDURE increment_etape(id BIGINT)
-AS $$
-BEGIN
-    UPDATE delivraptor.utilisateur
-    SET etape = etape + 1 WHERE bordereau = id;
-
-    INSERT INTO delivraptor.logs (id_utilisateur)
-        VALUES (id);
-END;
-$$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION delivraptor.premier_log_func()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -53,3 +42,7 @@ INSERT INTO delivraptor.client (identifiant, mot_de_passe)
     ('Robert', '754?'),
     ('GupZoop', '45Ejkfsl'),
     ('Alizon', 'Super4');
+
+
+DELETE FROM delivraptor.logs;
+DELETE FROM delivraptor.utilisateur;

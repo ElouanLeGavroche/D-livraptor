@@ -1,21 +1,29 @@
 <?php
-$host = 'localhost';
-$port = '5432';
-$dbname = 'saedb';
-$user = 'sae';
-$password = 'racine';
+$socket = fsockopen("localhost", 8080);
+$bordereau;
 
-$dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
 
-try {
-    $pdo = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+$data = fread($socket, 1024);
+echo $data;
+fwrite($socket, "CONN Alizon Super4\n");
 
-} catch (PDOException $e) {
-    die("Erreur de connexion à la base de données : " . $e->getMessage());
+function next_func(){
+
 }
-
-
 ?>
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Script php</title>
+    </head>
+
+    <body>
+
+        <form action="cnx_func()" method="post">
+            <button type="submit">next</button>
+        </form>
+
+
+    </body>
+</html>
