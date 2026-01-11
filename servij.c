@@ -66,6 +66,22 @@
 #define MAX_LIVREUR 2
 #define MD5_SIZE 33
 
+
+// Constantes liée à la livraison du colis (étape 9)
+#define LIVRER_NORMAL 0
+#define LIVRER_ABSENT 1
+#define LIVRER_REFUSER 2
+
+// excuse en cas de refus de livraison
+#define RS_E1_MAUVAIS_ETAT "Le colis n'est pas en bonne état"
+#define RS_E2_MAUVAIS_COLIS "Ce n'est pas le bon colis"
+#define RS_E3_EN_RETARD "Le colis a pris trop de temps pour être livré"
+#define RS_E4_MAUVAISE_ADRESSE "Le colis à été livrée à la mauvaise adresse"
+
+// autre situation
+#define RS_LIVRER "Le colis à bien été livrée"
+#define RS_LIVRER_ABS "Le colis à bien été déposé dans la boite au lettre"
+
 // code retour
 /***************************************** */
 // Tout c'est passé correctement
@@ -276,9 +292,6 @@ int lire(int cnx, t_chaine *buffer)
  */
 int connexion(int cnx, PGconn *conn)
 {
-    /**
-     * Cette fonction
-     */
     // Contenu du message de l'utilisateur
     t_chaine buffer = {'\0'};
     // Résultat de la requête à postgresql
@@ -671,16 +684,57 @@ void help_panel(t_chaine *buffer){
 }
 
 /**
- * @fn livrer_refuser(int cnx)
+ * @fn livraison_client(int cnx)
  * @brief fait passer le temps
  * @param cnx connexion du socket
  */
-int livrer_refuser(int cnx){
-    //ETAPE 1 : livraison accepter / refuser
+int livraison_client(int cnx, int status){
+    int return_status = DONE;
 
-    //ETAPE 2 : absent / présent
+    switch (status)
+    {
+    case LIVRER_NORMAL:
+        write(cnx, RS_LIVRER, strlen(RS_LIVRER));    
+        break;
+    
+    case LIVRER_ABSENT:
+        write(cnx, RS_LIVRER_ABS, strlen(RS_LIVRER_ABS));
+        break;
 
-    return 0;
+    case LIVRER_REFUSER:
+        /*
+        Quand le client refuse une commande, l'on simule alors une excuse que l'on va
+        choisir ici aléatoirement
+        */
+        srand( time( NULL ) );
+        int excuse_rd = rand() % 6;
+        switch (excuse_rd)
+        {
+        case 1:
+            write(cnx, RS_E1_MAUVAIS_ETAT, strlen(RS_E1_MAUVAIS_ETAT));
+            break;
+        
+        case 2:
+            write(cnx, RS_E2_MAUVAIS_COLIS, strlen(RS_E2_MAUVAIS_COLIS));
+            break;
+    
+        case 3:
+            write(cnx, RS_E3_EN_RETARD, strlen(RS_E3_EN_RETARD));
+            break;
+
+        case 4:
+            write(cnx, RS_E4_MAUVAISE_ADRESSE, strlen(RS_E4_MAUVAISE_ADRESSE));
+            break;
+        
+        default:
+            break;
+        }
+        break;
+    default:
+        return_status = ERROR;
+        break;
+    }
+    return return_status;
 }
 
 /**
