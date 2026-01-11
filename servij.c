@@ -150,6 +150,9 @@ typedef char t_chaine_bordereau[LONGUEUR_BORDEREAU];
 // type pour les chaine lié au entré de l'utilisateur
 typedef char t_chaine[LONGUEUR_MSG];
 
+
+
+// EN-TETE FONCTIONS
 void message_console_serveur(int type, int msg);
 void tuer_sous_processus();
 void help_panel(t_chaine *buffer);
@@ -173,8 +176,12 @@ int main()
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
 
+    //socket en comm avec le client
     int sock;
+
+    //resultat de certaine fonction
     int ret;
+    
     struct sockaddr_in addr;
     int size;
     int cnx;
@@ -435,7 +442,7 @@ int gestion_des_message(int cnx, PGconn *conn)
     } while (en_fonctionnement == true);
 
     message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_FIN_DE_LA_COMMUNICATION);
-    return EXIT_SUCCESS;
+    return DONE;
 }
 
 /**
@@ -580,7 +587,8 @@ void tuer_sous_processus()
  */
 int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
 {
-    
+    int return_status = DONE;
+
     PGresult *res = PQexec(
         conn,
         "SELECT count(*) FROM delivraptor.utilisateur WHERE etape <= 3"
@@ -590,8 +598,9 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
     strcpy(nb_element_etape, PQgetvalue(res, 0, 0));
     int nb_elt = atoi(PQgetvalue(res, 0, 0));
     if (nb_elt >= MAX_LIVREUR){
-        return LIVREUR_FULL;
+        return_status = LIVREUR_FULL;
     }
+
     else if (id != NULL)
     {
         // Avoir le temps
@@ -618,17 +627,20 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
 
         const char *listenn_argemenn[1] = {bordereau_temp};
 
-        PQexecParams(conn,
-                     "INSERT INTO delivraptor.utilisateur (bordereau, etape) VALUES ($1, 1)",
-                     1,
-                     NULL,
-                     listenn_argemenn,
-                     NULL,
-                     NULL,
-                     0);
-        return DONE;
+        PQexecParams(
+            conn,
+            "INSERT INTO delivraptor.utilisateur (bordereau, etape) VALUES ($1, 1)",
+            1,
+            NULL,
+            listenn_argemenn,
+            NULL,
+            NULL,
+            0);
     }
-    return ERROR;
+    else{
+        return_status = ERROR;
+    }
+    return return_status;
 }
 
 
