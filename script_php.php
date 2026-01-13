@@ -7,9 +7,6 @@ $data = fread($socket, 1024);
 echo $data;
 fwrite($socket, "CONN Alizon Super4\n");
 
-function next_func(){
-
-}
 ?>
 
 <!DOCTYPE html>
@@ -20,10 +17,34 @@ function next_func(){
 
     <body>
 
-        <form action="cnx_func()" method="post">
-            <button type="submit">next</button>
-        </form>
+        <p>
+        <?php
+            $res = fread($socket, 1024);
+            echo $res;
+            fwrite($socket, "GET 95121224\n");
+            $res = fread($socket, 1024);
+            /*
+            $res = fread($socket, sizeof($socket));
+            echo $res;
+            */
 
+            $lecture = true;
+            file_put_contents("./image.png", '');
+            while($lecture){
+                $res = fread($socket, 8192);
+                if(strlen($res) == 8192){
+                    file_put_contents("./image.png", $res ,FILE_APPEND);
+                    $res = '';
+                }
+                else{
+                    file_put_contents("./image.png", $res ,FILE_APPEND);
+                    $lecture = false;
+                }
 
+            }
+            ?>
+        </p>
+        <?php echo '<img src="data:image/png;base64,'.base64_encode(file_get_contents("image.png")).'" />';?>
+            
     </body>
 </html>

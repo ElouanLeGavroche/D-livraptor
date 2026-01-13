@@ -31,6 +31,11 @@
 #include <sys/wait.h>
 #include <regex.h>
 #include <libpq-fe.h>
+#include <fcntl.h>
+
+
+#define IMAGE_PATH "image/image.png"
+#define IMAGE_SIZE 8192
 
 // CPLS = Constante pour les logs serveur
 // TCPLS Tête Constante pour les logs serveur
@@ -73,14 +78,14 @@
 #define LIVRER_REFUSER 2
 
 // excuse en cas de refus de livraison
-#define RS_E1_MAUVAIS_ETAT "Le colis n'est pas en bonne état"
-#define RS_E2_MAUVAIS_COLIS "Ce n'est pas le bon colis"
-#define RS_E3_EN_RETARD "Le colis a pris trop de temps pour être livré"
-#define RS_E4_MAUVAISE_ADRESSE "Le colis à été livrée à la mauvaise adresse"
+#define RS_E1_MAUVAIS_ETAT "Le colis n'est pas en bonne état\n"
+#define RS_E2_MAUVAIS_COLIS "Ce n'est pas le bon colis\n"
+#define RS_E3_EN_RETARD "Le colis a pris trop de temps pour être livré\n"
+#define RS_E4_MAUVAISE_ADRESSE "Le colis à été livrée à la mauvaise adresse\n"
 
 // autre situation
-#define RS_LIVRER "Le colis à bien été livrée"
-#define RS_LIVRER_ABS "Le colis à bien été déposé dans la boite au lettre"
+#define RS_LIVRER "Le colis à bien été livrée\n"
+#define RS_LIVRER_ABS "Le colis à bien été déposé dans la boite au lettre\n"
 
 // code retour
 /***************************************** */
@@ -149,6 +154,8 @@ const char MDLS_NEXT_STEP[] = "NEXT";
 typedef char t_chaine_bordereau[LONGUEUR_BORDEREAU];
 // type pour les chaine lié au entré de l'utilisateur
 typedef char t_chaine[LONGUEUR_MSG];
+// type pour images
+typedef char t_image[IMAGE_SIZE];
 
 
 
@@ -158,14 +165,14 @@ void tuer_sous_processus();
 void help_panel(t_chaine *buffer);
 void passer_temps(PGconn *conn);
 
+
 int lire(int cnx, t_chaine *buffer);
 int connexion(int cnx, PGconn *conn);
 int gestion_des_message(int cnx, PGconn *conn);
 
 int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn);
-int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse);
-
-
+int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, int *cnx);
+int livraison_client(int cnx, int status);
 
 /**
  * @fn int main()
@@ -415,7 +422,7 @@ int gestion_des_message(int cnx, PGconn *conn)
         else if (sscanf(buffer, MU_RECUPERER, param) == 1)
         {
 
-            get_etat_utilisateur(&param, conn, &reponse);
+            get_etat_utilisateur(&param, conn, &reponse, &cnx);
             write(cnx, &reponse, strlen(reponse));
         }
         // Hello Serveur si on veux...
@@ -597,6 +604,7 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
     t_chaine nb_element_etape = {'\0'};
     strcpy(nb_element_etape, PQgetvalue(res, 0, 0));
     int nb_elt = atoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
     if (nb_elt >= MAX_LIVREUR){
         return_status = LIVREUR_FULL;
     }
@@ -645,16 +653,18 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
 
 
 /**
- * @fn int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
+ * @fn int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, int *cnx)
  * @brief va chercher dans la base de donnée pour donnée l'état actuel d'une commande
  * @param borderau le numéro qui sert à le retrouver dans la base de donnée
  * @param conn connexion à la base de donnée
  * @param reponse vide au départ, contient le message de réponse obtenu avec la requête
  */
-int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
+int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, int *cnx)
 {
 
     const char *listenn_argemenn[1] = {*bordereau};
+
+    memset(*reponse, 0, sizeof(*reponse));
 
     PGresult *res = PQexecParams(
         conn,
@@ -672,15 +682,20 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse)
     if (rows == 0){
         return ERROR;
     }
-
-    for (int i = 0; i < rows; i++)
-    {
-        for (int j = 0; j < cols; j++)
+    if (atoi(PQgetvalue(res, 0, 1)) == 9){
+        livraison_client(*cnx, 1);
+    }
+    else{
+        for (int i = 0; i < rows; i++)
         {
-            strcat(*reponse, PQgetvalue(res, i, j));
-            strcat(*reponse, " | ");
+            for (int j = 0; j < cols; j++)
+            {
+                strcat(*reponse, PQgetvalue(res, i, j));
+                strcat(*reponse, " | ");
+            }
         }
     }
+    PQclear(res);
     strcat(*reponse, "\n");
 
     return DONE;
@@ -711,6 +726,18 @@ int livraison_client(int cnx, int status){
     
     case LIVRER_ABSENT:
         write(cnx, RS_LIVRER_ABS, strlen(RS_LIVRER_ABS));
+
+
+        // Ouvrir l'image :
+        t_image image;
+
+        FILE *fd = fopen(IMAGE_PATH, "rb");
+
+        do{
+            fread(image, sizeof(image), 1, fd);
+            write(cnx, image, sizeof(image));
+        }while(!feof(fd));
+
         break;
 
     case LIVRER_REFUSER:
@@ -755,8 +782,10 @@ int livraison_client(int cnx, int status){
  * @param conn Pour mettre à jour la base de donnée
  */
 void passer_temps(PGconn *conn){
-    PQexec(
+    PGresult *res = PQexec(
         conn,
         "UPDATE delivraptor.utilisateur SET etape = etape + 1 WHERE etape < 9"
     );
+
+    PQclear(res);
 }
