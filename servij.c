@@ -120,6 +120,7 @@
 
 // réponse s'il n'y a plus de livreur dispo
 #define RS_LIVREUR_MAX "FULL\n"
+
 /***************************************** */
 
 // MU = message utilisateur
@@ -139,11 +140,6 @@ const char MU_CREE[] = "CREATE %253s";
 // message de demande de récupération d'état d'un user
 const char MU_RECUPERER[] = "GET %s";
 
-// message quelquonque
-const char MU_QUELQUONQUE[] = "%s %s";
-
-// option d'aide
-const char MU_HELP[] = "--help";
 /****************************************** */
 
 // MDLS = message de la simulation
@@ -178,8 +174,13 @@ int livraison_client(int cnx, int status);
  * @fn int main()
  * @brief Fonction principale, où le père donne naissance à ces enfants avant de les fork vers d'autre horizon
  */
-int main()
+int main(int argc, char *argv[])
 {
+    //Géré les options
+    int getopt(int argc, char * const argv[], const char *optstring);
+    extern int optind;
+    extern char *optarg;
+
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
 
@@ -237,6 +238,7 @@ int main()
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == -1)
     {
+        
         return EXIT_FAILURE;
     }
 
@@ -350,6 +352,10 @@ int connexion(int cnx, PGconn *conn)
     {
         write(cnx, RS_ERROR, strlen(RS_ERROR));
     }
+    else
+    {
+        write(cnx, RS_CONNECTER, strlen(RS_CONNECTER));
+    }
     //Fermer la connexion
     return demande_correcte;
 }
@@ -371,8 +377,6 @@ int gestion_des_message(int cnx, PGconn *conn)
     t_chaine param = {'\0'};
     // Réponse du serveur à l'utilisateur
     t_chaine reponse = {'\0'};
-    // Commande quelquonque
-    t_chaine quelquonque = {'\0'};
     // Resultat des fonctions
     int res;
     
@@ -396,13 +400,9 @@ int gestion_des_message(int cnx, PGconn *conn)
         message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ENVOIE_DES_INFORMATIONS);
 
         
-        // Voir s'il s'agit d'un help
-        if(sscanf(buffer, MU_QUELQUONQUE, quelquonque ,param) == 2 && strncmp(param, MU_HELP, sizeof(MU_HELP)) == 0)
-        {
-            help_panel(&quelquonque);
-        }
+
         // Crée un nouveau bordereau
-        else if (sscanf(buffer, MU_CREE, param) == 1)
+        if (sscanf(buffer, MU_CREE, param) == 1)
         {
             t_chaine_bordereau bordereau;
             res = cree_bordereau(&bordereau, param, conn);
@@ -422,8 +422,14 @@ int gestion_des_message(int cnx, PGconn *conn)
         else if (sscanf(buffer, MU_RECUPERER, param) == 1)
         {
 
-            get_etat_utilisateur(&param, conn, &reponse, &cnx);
-            write(cnx, &reponse, strlen(reponse));
+            res = get_etat_utilisateur(&param, conn, &reponse, &cnx);
+            if(res == -1){
+                write(cnx, RS_ERROR, strlen(RS_ERROR));    
+            }
+            else{
+                write(cnx, &reponse, strlen(reponse));
+            }
+            
         }
         // Hello Serveur si on veux...
         else if (strncmp(buffer, MU_BONJOUR, strlen(MU_BONJOUR) - 1) == 0)
@@ -702,15 +708,6 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, i
 }
 
 /**
- * @fn help_panel(t_chaine *buffer)
- * @brief sert à expliquer les commande du programe
- * @param buffer pour savoir de quel commade il s'agit
- */
-void help_panel(t_chaine *buffer){
-    printf("%s", *buffer);
-}
-
-/**
  * @fn livraison_client(int cnx)
  * @brief fait passer le temps
  * @param cnx connexion du socket
@@ -732,7 +729,8 @@ int livraison_client(int cnx, int status){
         t_image image;
 
         FILE *fd = fopen(IMAGE_PATH, "rb");
-
+        
+        //Envoie de l'image
         do{
             fread(image, sizeof(image), 1, fd);
             write(cnx, image, sizeof(image));
