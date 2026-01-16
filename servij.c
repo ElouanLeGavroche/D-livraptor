@@ -176,7 +176,6 @@ const char MDLS_NEXT_STEP[] = "NEXT";
 // EN-TETE FONCTIONS
 void message_console_serveur(int type, int msg);
 void tuer_sous_processus();
-void help_panel(t_chaine *buffer);
 void passer_temps(PGconn *conn);
 
 size_t get_info_image(t_chaine *message);
@@ -187,7 +186,6 @@ int get_etat_livraison(t_chaine *message);
 int get_image(size_t taille, int cnx, t_image *image);
 int cree_bordereau(t_chaine *message, char *id, PGconn *conn);
 int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, int *cnx);
-int livraison_client(int cnx, int status, t_chaine *message);
 
 /**
  * @fn int main()
@@ -464,7 +462,6 @@ int gestion_des_message(int cnx, PGconn *conn)
             }
 
         }
-
         // Pour avoir l'état de la livraison arrivé à l'étape 9
         else if (strncmp(buffer, MU_AVOIR_ETAT_LIVRAISON, strlen(MU_AVOIR_ETAT_LIVRAISON)) == 0){
             int res = get_etat_livraison(&message);
@@ -783,82 +780,6 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, i
     return return_status;
 }
 
-/**
- * @fn livraison_client(int cnx, int status, t_chaine *message)
- * @brief fait passer le temps
- * @param cnx connexion du socket
- */
-int livraison_client(int cnx, int status, t_chaine *message){
-    int return_status = DONE;
-    
-
-    switch (status)
-    {
-    case LIVRER_NORMAL:
-        write(cnx, RS_LIVRER, sizeof(RS_LIVRER));    
-        break;
-    
-    case LIVRER_ABSENT:
-        write(cnx, RS_LIVRER_ABS, sizeof(RS_LIVRER_ABS));   
-
-        // Ouvrir l'image :
-        t_image image;
-
-        FILE *fd = fopen(IMAGE_PATH, "rb");
-        
-        //Envoie de l'image
-        do{
-            
-            fread(image, sizeof(image), 1, fd);
-            write(cnx, image, sizeof(image));
-            
-        }while(!feof(fd));
-
-        image[IMAGE_SIZE - 1] = '\n';
-        write(cnx, image, sizeof(image));
-
-        fclose(fd);
-        break;
-
-    case LIVRER_REFUSER:
-        /*
-        Quand le client refuse une commande, l'on simule alors une excuse que l'on va
-        choisir ici aléatoirement
-        */
-        write(cnx, RS_LIVRER_REF, sizeof(RS_LIVRER_REF));
-
-        
-        int excuse_rd = rand() % 4;
-        switch (excuse_rd)
-        {
-        case 0:
-            write(cnx, RS_E1_MAUVAIS_ETAT, sizeof(RS_E1_MAUVAIS_ETAT));
-            break;
-        
-        case 1:
-            write(cnx, RS_E2_MAUVAIS_COLIS, sizeof(RS_E2_MAUVAIS_COLIS));
-            break;
-    
-        case 2:
-            write(cnx, RS_E3_EN_RETARD, sizeof(RS_E3_EN_RETARD));
-            break;
-
-        case 3:
-            write(cnx, RS_E4_MAUVAISE_ADRESSE, sizeof(RS_E4_MAUVAISE_ADRESSE));
-            break;
-        
-        default:
-            write(cnx, RS_E4_MAUVAISE_ADRESSE, sizeof(RS_E4_MAUVAISE_ADRESSE));
-            break;
-        }
-        break;
-    default:
-        return_status = ERROR;
-        break;
-    }
-    return return_status;
-}
-
 size_t get_info_image(t_chaine *message){
     size_t taille;
 
@@ -871,6 +792,7 @@ size_t get_info_image(t_chaine *message){
     snprintf(*message, LONGUEUR_MSG, "%s | %ld\n", ET_DATA, taille);
     return taille;
 }
+
 int get_image(size_t taille, int cnx, t_image *image){
     int return_value = DONE;
 
