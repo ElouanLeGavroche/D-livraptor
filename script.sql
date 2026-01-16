@@ -17,7 +17,7 @@ CREATE TABLE delivraptor.logs(
     CONSTRAINT fk_utilisateur_logs FOREIGN KEY (id_utilisateur)
         REFERENCES delivraptor.utilisateur(bordereau)
 );
-CREATE TABLE client(
+CREATE TABLE delivraptor.client(
     identifiant VARCHAR(25) PRIMARY KEY,
     mot_de_passe VARCHAR(25)
 );

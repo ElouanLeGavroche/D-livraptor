@@ -6,12 +6,23 @@ $data = fread($socket, 1024);
 echo $data;
 fwrite($socket, "CONN Alizon Super4\n");
 
+/*
+fread($socket, 1024);
+$data = fwrite($socket, "CREATE 420\n");
+*/
 ?>
 
 <!DOCTYPE html>
 <html>
     <head>
         <title>Script php</title>
+        <?php include_once "elements_page_general/head.php" ?>
+   
+        <link rel="stylesheet" type="text/css" href="elements_page_catalogue/article.css">
+        <link rel="stylesheet" type="text/css" href="elements_page_catalogue/carousselle.css">
+        <link rel="stylesheet" type="text/css" href="elements_page_catalogue/une.css">
+        <link rel="stylesheet" type="text/css" href="style_catalogue/style.css">
+
     </head>
 
     <body>
@@ -27,12 +38,16 @@ fwrite($socket, "CONN Alizon Super4\n");
             $res = fread($socket, 1024);
             echo $res;
             ?>
+            <?php
+            $res = fread($socket, 1024);
+            echo $res;
+            ?>
         </p>
 
         <p>
         <?php
             
-            fwrite($socket, "GET 1628272142\n");
+            fwrite($socket, "GET 1700327895\n");
             $res = fread($socket, 1024);
             echo $res;
 

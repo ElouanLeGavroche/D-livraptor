@@ -71,21 +71,10 @@
 #define MAX_LIVREUR 2
 #define MD5_SIZE 33
 
-
 // Constantes liée à la livraison du colis (étape 9)
 #define LIVRER_NORMAL 0
 #define LIVRER_ABSENT 1
 #define LIVRER_REFUSER 2
-
-// excuse en cas de refus de livraison
-#define RS_E1_MAUVAIS_ETAT "Le colis n'est pas en bonne état\n"
-#define RS_E2_MAUVAIS_COLIS "Ce n'est pas le bon colis\n"
-#define RS_E3_EN_RETARD "Le colis a pris trop de temps pour être livré\n"
-#define RS_E4_MAUVAISE_ADRESSE "Le colis à été livrée à la mauvaise adresse\n"
-
-// autre situation
-#define RS_LIVRER "Le colis à bien été livrée\n"
-#define RS_LIVRER_ABS "Le colis à bien été déposé dans la boite au lettre\n"
 
 // code retour
 /***************************************** */
@@ -98,30 +87,52 @@
 // La file des livreur est pleine
 #define LIVREUR_FULL 1
 
+// Le colis est arrivé chez le client
+#define ARRIVED 2
+
+// type pour la chaine du bordereau
+typedef char t_chaine_bordereau[LONGUEUR_BORDEREAU];
+// type pour les chaine lié au entré de l'utilisateur
+typedef char t_chaine[LONGUEUR_MSG];
+// type pour images
+typedef char t_image[IMAGE_SIZE];
+
+// excuse en cas de refus de livraison
+const t_chaine RS_E1_MAUVAIS_ETAT = {"Le colis n'est pas en bonne état\n"};
+const t_chaine RS_E2_MAUVAIS_COLIS = {"Ce n'est pas le bon colis\n"};
+const t_chaine RS_E3_EN_RETARD = {"Le colis a pris trop de temps pour être livré\n"};
+const t_chaine RS_E4_MAUVAISE_ADRESSE = {"Le colis à été livrée à la mauvaise adresse\n"};
+
+// autre situation
+const t_chaine RS_LIVRER = {"0\n"};
+const t_chaine RS_LIVRER_ABS = {"1\n"};
+const t_chaine RS_LIVRER_REF = {"2\n"};
+
 // RS = Réponse serveur
 /***************************************** */
 // réponse du serveur après le bonjour
-#define RS_BONJOUR "HELLO_USER\n"
+const t_chaine RS_BONJOUR = {"HELLO_USER\n"};
 
 // réponse du serveur lorsqu'il reçoit une commande inconnu ou éronée
-#define RS_MAUVAISE_COMMANDE "BAD_COMMAND\n"
+const t_chaine RS_MAUVAISE_COMMANDE = {"BAD_COMMAND\n"};
 
 // réponse du serveur si le login ou mdp du client est mauvais
-#define RS_ERROR "ERROR\n"
+const t_chaine RS_ERROR = {"ERROR\n"};
 
 // réponse du serveur après qu'une connexion ce soit bien passé
-#define RS_CONNECTER "DONE\n"
+const t_chaine RS_CONNECTER = {"DONE\n"};
 
 // symbole d'entré avant connexion
-#define RS_MESSAGE_BIENVENUE "-> : "
+const t_chaine RS_MESSAGE_BIENVENUE = {"-> : "};
 
 // symbole d'entré apreès connexion
-#define RS_MESSAGE_CONNECTER "Service -> :"
+const t_chaine RS_MESSAGE_CONNECTER = {"Service -> :"};
 
 // réponse s'il n'y a plus de livreur dispo
-#define RS_LIVREUR_MAX "FULL\n"
+const t_chaine RS_LIVREUR_MAX = {"FULL\n"};
 
 /***************************************** */
+
 
 // MU = message utilisateur
 /***************************************** */
@@ -145,13 +156,6 @@ const char MU_RECUPERER[] = "GET %s";
 // MDLS = message de la simulation
 /***************************************** */
 const char MDLS_NEXT_STEP[] = "NEXT"; 
-
-// type pour la chaine du bordereau
-typedef char t_chaine_bordereau[LONGUEUR_BORDEREAU];
-// type pour les chaine lié au entré de l'utilisateur
-typedef char t_chaine[LONGUEUR_MSG];
-// type pour images
-typedef char t_image[IMAGE_SIZE];
 
 
 
@@ -189,6 +193,9 @@ int main(int argc, char *argv[])
 
     //resultat de certaine fonction
     int ret;
+
+    // Générateur de nb pseudo aléatoire
+    srand( time( NULL ) );
     
     struct sockaddr_in addr;
     int size;
@@ -327,7 +334,6 @@ int connexion(int cnx, PGconn *conn)
 
     if (sscanf(buffer, MU_CONNEXION, identifiant, mot_de_passe) == 2)
     {
-        printf("Je rentre ici \n");
         // Liste des arguments qui seront rentré dans la requête
         const char *listenn_argemenn[2] = {identifiant, mot_de_passe};
 
@@ -423,8 +429,19 @@ int gestion_des_message(int cnx, PGconn *conn)
         {
 
             res = get_etat_utilisateur(&param, conn, &reponse, &cnx);
-            if(res == -1){
+            if(res == ERROR){
                 write(cnx, RS_ERROR, strlen(RS_ERROR));    
+            }
+            else if(res == ARRIVED){
+                write(cnx, &reponse, strlen(reponse));
+
+                srand( time( NULL ) );
+
+                //Uniquement pour la simulation, permet d'avoir des chiffre rd différent
+                system("sleep 1");
+                
+                int val = rand() % 3;
+                livraison_client(cnx, val);
             }
             else{
                 write(cnx, &reponse, strlen(reponse));
@@ -667,7 +684,7 @@ int cree_bordereau(t_chaine_bordereau *bordereau, char *id, PGconn *conn)
  */
 int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, int *cnx)
 {
-
+    int return_status = DONE;
     const char *listenn_argemenn[1] = {*bordereau};
 
     memset(*reponse, 0, sizeof(*reponse));
@@ -685,11 +702,9 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, i
     int rows = PQntuples(res);
     int cols = PQnfields(res);
     
+    
     if (rows == 0){
-        return ERROR;
-    }
-    if (atoi(PQgetvalue(res, 0, 1)) == 9){
-        livraison_client(*cnx, 1);
+        return_status = ERROR;
     }
     else{
         for (int i = 0; i < rows; i++)
@@ -700,11 +715,15 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *reponse, i
                 strcat(*reponse, " | ");
             }
         }
+        if (atoi(PQgetvalue(res, 0, 1)) == 9){
+            return_status = ARRIVED;
+        }
     }
+    
     PQclear(res);
     strcat(*reponse, "\n");
 
-    return DONE;
+    return return_status;
 }
 
 /**
@@ -718,12 +737,11 @@ int livraison_client(int cnx, int status){
     switch (status)
     {
     case LIVRER_NORMAL:
-        write(cnx, RS_LIVRER, strlen(RS_LIVRER));    
+        write(cnx, RS_LIVRER, sizeof(RS_LIVRER));    
         break;
     
     case LIVRER_ABSENT:
-        write(cnx, RS_LIVRER_ABS, strlen(RS_LIVRER_ABS));
-
+        write(cnx, RS_LIVRER_ABS, sizeof(RS_LIVRER_ABS));   
 
         // Ouvrir l'image :
         t_image image;
@@ -732,10 +750,16 @@ int livraison_client(int cnx, int status){
         
         //Envoie de l'image
         do{
+            
             fread(image, sizeof(image), 1, fd);
             write(cnx, image, sizeof(image));
+            
         }while(!feof(fd));
 
+        image[IMAGE_SIZE - 1] = '\n';
+        write(cnx, image, sizeof(image));
+
+        fclose(fd);
         break;
 
     case LIVRER_REFUSER:
@@ -743,27 +767,33 @@ int livraison_client(int cnx, int status){
         Quand le client refuse une commande, l'on simule alors une excuse que l'on va
         choisir ici aléatoirement
         */
-        srand( time( NULL ) );
-        int excuse_rd = rand() % 6;
+        write(cnx, RS_LIVRER_REF, sizeof(RS_LIVRER_REF));
+
+
+        //Uniquement pour la simulation, permet d'avoir des chiffre rd différent
+        system("sleep 1");
+        
+        int excuse_rd = rand() % 4;
         switch (excuse_rd)
         {
-        case 1:
-            write(cnx, RS_E1_MAUVAIS_ETAT, strlen(RS_E1_MAUVAIS_ETAT));
+        case 0:
+            write(cnx, RS_E1_MAUVAIS_ETAT, sizeof(RS_E1_MAUVAIS_ETAT));
             break;
         
-        case 2:
-            write(cnx, RS_E2_MAUVAIS_COLIS, strlen(RS_E2_MAUVAIS_COLIS));
+        case 1:
+            write(cnx, RS_E2_MAUVAIS_COLIS, sizeof(RS_E2_MAUVAIS_COLIS));
             break;
     
-        case 3:
-            write(cnx, RS_E3_EN_RETARD, strlen(RS_E3_EN_RETARD));
+        case 2:
+            write(cnx, RS_E3_EN_RETARD, sizeof(RS_E3_EN_RETARD));
             break;
 
-        case 4:
-            write(cnx, RS_E4_MAUVAISE_ADRESSE, strlen(RS_E4_MAUVAISE_ADRESSE));
+        case 3:
+            write(cnx, RS_E4_MAUVAISE_ADRESSE, sizeof(RS_E4_MAUVAISE_ADRESSE));
             break;
         
         default:
+            write(cnx, RS_E4_MAUVAISE_ADRESSE, sizeof(RS_E4_MAUVAISE_ADRESSE));
             break;
         }
         break;
