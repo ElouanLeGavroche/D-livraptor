@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS delivraptor.utilisateur, delivraptor.logs, delivraptor.clie
 CREATE TABLE delivraptor.utilisateur(
     bordereau BIGINT UNIQUE NOT NULL,
     etape INT
-)
+);
 
 CREATE TABLE delivraptor.logs(
     id SERIAL PRIMARY KEY,
@@ -42,7 +42,3 @@ INSERT INTO delivraptor.client (identifiant, mot_de_passe)
     ('Robert', '754?'),
     ('GupZoop', '45Ejkfsl'),
     ('Alizon', 'Super4');
-
-
-DELETE FROM delivraptor.logs;
-DELETE FROM delivraptor.utilisateur;

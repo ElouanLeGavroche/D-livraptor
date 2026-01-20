@@ -48,6 +48,7 @@
     #define CPLS_FIN_DE_LA_COMMUNICATION 5
     #define CPLS_SOUS_PROCESSUS_TERMINER 6
     #define CPLS_CONNEXION_CLIENT_EFFECTUER 7
+    #define CPLS_DATA_ENVOYER 8
 
 #define T_CPLS_SERVEUR_WARN 2
     #define CPLS_PAS_DE_message 1
@@ -69,7 +70,7 @@
 #define LONGUEUR_MSG 1024
 #define LONGUEUR_BORDEREAU 33
 
-#define MAX_LIVREUR 2
+#define MAX_LIVREUR 5 
 #define MD5_SIZE 33
 
 // Constantes liée à la livraison du colis (étape 9)
@@ -176,6 +177,7 @@ const char MDLS_NEXT_STEP[] = "NEXT";
 // EN-TETE FONCTIONS
 void message_console_serveur(int type, int msg);
 void tuer_sous_processus();
+size_t get_taille_image();
 void passer_temps(PGconn *conn);
 
 size_t get_info_image(t_chaine *message);
@@ -197,6 +199,14 @@ int main(int argc, char *argv[])
     int getopt(int argc, char * const argv[], const char *optstring);
     extern int optind;
     extern char *optarg;
+
+    /*
+    int i;
+    for (i = 0; i < argc; ++i)
+    {
+        
+    }
+    */
 
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
@@ -226,7 +236,11 @@ int main(int argc, char *argv[])
 
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DU_SOCKET);
     sock = socket(AF_INET, SOCK_STREAM, 0);
-
+    if(sock == -1){
+        close(sock);
+        return EXIT_FAILURE;
+    }
+    
     int opt = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
     {
@@ -247,7 +261,7 @@ int main(int argc, char *argv[])
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == -1)
     {
-        
+        close(sock);
         return EXIT_FAILURE;
     }
 
@@ -262,6 +276,8 @@ int main(int argc, char *argv[])
 
         cnx = accept(sock, (struct sockaddr *)&conn_addr, (socklen_t *)&size);
         pid_t pid = fork();
+
+        srand( time( NULL ) );
 
         if (pid == 0)
         {
@@ -440,7 +456,7 @@ int gestion_des_message(int cnx, PGconn *conn)
         else if (sscanf(buffer, MU_AVOIR_IMAGE, param) == 1){
             t_image image;
 
-            int res = get_image(27107, cnx, &image);
+            int res = get_image(get_taille_image(), cnx, &image);
 
             if(res == ERROR){
                 write(cnx, RS_ERROR, strlen(RS_ERROR));
@@ -483,9 +499,6 @@ int gestion_des_message(int cnx, PGconn *conn)
             }
             else{
                 write(cnx, message, strlen(message));
-                
-                //int val = rand() % 3;
-                //livraison_client(cnx, val);
             }
             
         }
@@ -509,6 +522,8 @@ int gestion_des_message(int cnx, PGconn *conn)
             message_console_serveur(T_CPLS_SERVEUR_WARN, CPLS_COMMANDE_INCOMPRISE);
             write(cnx, RS_MAUVAISE_COMMANDE, strlen(RS_MAUVAISE_COMMANDE));
         }
+
+        message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_DATA_ENVOYER);
 
     } while (en_fonctionnement == true);
 
@@ -558,7 +573,9 @@ void message_console_serveur(int type, int msg)
         case 7:
             printf("Connexion cliente faite\n");
             break;
-
+        case 8:
+            printf("Donnée Envoyer\n");
+            break;
         default:
             printf("[Inconnu]\n");
             break;
@@ -793,6 +810,18 @@ size_t get_info_image(t_chaine *message){
     return taille;
 }
 
+size_t get_taille_image(){
+    size_t taille;
+
+    // Récupérer la taille de l'image
+    struct stat st;
+    if(stat(IMAGE_PATH, &st) == 0){
+        // Permet d'envoyer la taille de l'image au script php
+        taille = st.st_size;
+    }
+    return taille;
+}
+
 int get_image(size_t taille, int cnx, t_image *image){
     int return_value = DONE;
 
@@ -820,8 +849,9 @@ int get_image(size_t taille, int cnx, t_image *image){
             }
         }
     }
-
-    fclose(fd);
+    if(fd != NULL){
+        fclose(fd);
+    }
 
     return return_value;
 }
@@ -832,7 +862,6 @@ int get_image(size_t taille, int cnx, t_image *image){
  * @param message est le message qui sera retourner au client
  */
 int get_etat_livraison(t_chaine *message){
-    srand( time( NULL ) );
     int etat_livrer = rand()%3;
     
     if(etat_livrer == 2){
