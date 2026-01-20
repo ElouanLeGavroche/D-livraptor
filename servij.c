@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
         {
             // connexion à la base de donnée
             PGconn *conn = PQconnectdb(
-                "host=postgresdb port=5432 dbname=saedb user=sae password=racine");
+                "host=127.0.0.1 port=5432 dbname=saedb user=sae password=racine");
 
             if (PQstatus(conn) != CONNECTION_OK)
             {
