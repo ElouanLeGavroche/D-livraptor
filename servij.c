@@ -200,13 +200,25 @@ int main(int argc, char *argv[])
     extern int optind;
     extern char *optarg;
 
-    /*
+    char *adresse;
+    int port;
     int i;
+
     for (i = 0; i < argc; ++i)
     {
+        switch (i)
+        {
+        case 1:
+            adresse = argv[1];
+            break;
         
+        case 2:
+            port = atoi(argv[2]);
+        default:
+            break;
+        }    
     }
-    */
+    
 
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
@@ -252,9 +264,9 @@ int main(int argc, char *argv[])
     // connexion effectuer au serveur
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD);
 
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_addr.s_addr = inet_addr(adresse);
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(8080);
+    addr.sin_port = htons(port);
 
     size = sizeof(conn_addr);
 
