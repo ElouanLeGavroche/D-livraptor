@@ -273,13 +273,14 @@ int main(int argc, char *argv[])
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == -1)
     {
+        message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CONNEXION_AVEC_LA_BD);
         close(sock);
         return EXIT_FAILURE;
     }
 
     ret = listen(sock, 1);
     if (ret == -1)
-    {
+    {   
         return EXIT_FAILURE;
     }
 
