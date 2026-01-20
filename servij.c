@@ -248,6 +248,7 @@ int main(int argc, char *argv[])
 
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DU_SOCKET);
     sock = socket(AF_INET, SOCK_STREAM, 0);
+
     if(sock == -1){
         close(sock);
         return EXIT_FAILURE;
@@ -269,11 +270,10 @@ int main(int argc, char *argv[])
     addr.sin_port = htons(port);
 
     size = sizeof(conn_addr);
-
+    
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == -1)
     {
-        message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CONNEXION_AVEC_LA_BD);
         close(sock);
         return EXIT_FAILURE;
     }
