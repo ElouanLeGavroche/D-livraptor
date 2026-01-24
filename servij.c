@@ -208,10 +208,10 @@ int main(int argc, char *argv[])
     char *adresse = NULL;
     int port = 0;
 
-    int opt;
-    while ((opt = getopt_long(argc, argv, "h", long_options, NULL)) != -1)
+    int options;
+    while ((options = getopt_long(argc, argv, "h", long_options, NULL)) != -1)
     {
-    switch (opt)
+    switch (options)
     {
         case 'h':
             opt_help(argv[0]);
@@ -238,8 +238,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Erreur: port invalide\n");
         return EXIT_FAILURE;
     }
-
-    
 
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
@@ -274,7 +272,8 @@ int main(int argc, char *argv[])
         close(sock);
         return EXIT_FAILURE;
     }
-    
+
+    int opt;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
     {
         message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CREATION_SOCKET);
@@ -284,7 +283,7 @@ int main(int argc, char *argv[])
     
     // connexion effectuer au serveur
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD);
-
+    
     addr.sin_addr.s_addr = inet_addr(adresse);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
@@ -309,7 +308,6 @@ int main(int argc, char *argv[])
 
         cnx = accept(sock, (struct sockaddr *)&conn_addr, (socklen_t *)&size);
         pid_t pid = fork();
-
         srand( time( NULL ) );
 
         if (pid == 0)
@@ -346,7 +344,7 @@ int main(int argc, char *argv[])
 void opt_help(const char *nom_prg)
 {
     printf(
-        "Delivraptor — serveur de suivi de livraison\n\n"
+        "Delivraptor : serveur de suivi de livraison\n\n"
         "Usage:\n"
         "  %s [OPTIONS] <adresse> <port>\n\n"
         "Options:\n"
