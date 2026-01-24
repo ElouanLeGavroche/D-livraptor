@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -179,6 +180,7 @@ void message_console_serveur(int type, int msg);
 void tuer_sous_processus();
 size_t get_taille_image();
 void passer_temps(PGconn *conn);
+void opt_help(const char *nom_prg);
 
 size_t get_info_image(t_chaine *message);
 int lire(int cnx, t_chaine *buffer);
@@ -189,35 +191,54 @@ int get_image(size_t taille, int cnx, t_image *image);
 int cree_bordereau(t_chaine *message, char *id, PGconn *conn);
 int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, int *cnx);
 
+
+static struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {0, 0, 0, 0}
+};
+
 /**
  * @fn int main()
  * @brief Fonction principale, où le père donne naissance à ces enfants avant de les fork vers d'autre horizon
  */
 int main(int argc, char *argv[])
 {
-    //Géré les options
-    int getopt(int argc, char * const argv[], const char *optstring);
-    extern int optind;
-    extern char *optarg;
 
-    char *adresse;
-    int port;
-    int i;
+    // Gesion des options
+    char *adresse = NULL;
+    int port = 0;
 
-    for (i = 0; i < argc; ++i)
+    int opt;
+    while ((opt = getopt_long(argc, argv, "h", long_options, NULL)) != -1)
     {
-        switch (i)
-        {
-        case 1:
-            adresse = argv[1];
-            break;
-        
-        case 2:
-            port = atoi(argv[2]);
+    switch (opt)
+    {
+        case 'h':
+            opt_help(argv[0]);
+            return EXIT_SUCCESS;
+
         default:
-            break;
-        }    
+            return EXIT_FAILURE;
+        }
     }
+
+    /* Arguments obligatoires après les options */
+    if (argc - optind != 2)
+    {
+        fprintf(stderr, "Erreur: adresse et port requis\n\n");
+        opt_help(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    adresse = argv[optind];
+    port = atoi(argv[optind + 1]);
+
+    if (port <= 0)
+    {
+        fprintf(stderr, "Erreur: port invalide\n");
+        return EXIT_FAILURE;
+    }
+
     
 
     // Init du système de communication
@@ -254,7 +275,6 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     
-    int opt = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
     {
         message_console_serveur(T_CPLS_SERVEUR_ERRO, CPLS_PROBLEME_CREATION_SOCKET);
@@ -296,7 +316,7 @@ int main(int argc, char *argv[])
         {
             // connexion à la base de donnée
             PGconn *conn = PQconnectdb(
-                "host=127.0.0.1 port=5432 dbname=saedb user=sae password=racine");
+                "host=localhost port=5432 dbname=saedb user=sae password=racine");
 
             if (PQstatus(conn) != CONNECTION_OK)
             {
@@ -321,6 +341,26 @@ int main(int argc, char *argv[])
     }
     return EXIT_SUCCESS;
 }
+
+
+void opt_help(const char *nom_prg)
+{
+    printf(
+        "Delivraptor — serveur de suivi de livraison\n\n"
+        "Usage:\n"
+        "  %s [OPTIONS] <adresse> <port>\n\n"
+        "Options:\n"
+        "  -h, --help            Affiche cette aide et quitte\n\n"
+        "Arguments:\n"
+        "  adresse               Adresse IPv4 d'écoute (ex: 127.0.0.1)\n"
+        "  port                  Port TCP (ex: 8080)\n\n"
+        "Exemple:\n"
+        "  %s 127.0.0.1 4242\n",
+        nom_prg,
+        nom_prg
+    );
+}
+
 
 /**
  * @fn int lire(int cnx, t_chaine *buffer)
