@@ -35,43 +35,42 @@
 #include <libpq-fe.h>
 #include <fcntl.h>
 
-
 #define IMAGE_PATH "image/image.png"
 #define IMAGE_SIZE 8192
 
 // CPLS = Constante pour les logs serveur
 // TCPLS Tête Constante pour les logs serveur
 #define T_CPLS_SERVEUR_INFO 1
-    #define CPLS_ECHANGE_OUVERT 1
-    #define CPLS_INFORMATION_RECU 2
-    #define CPLS_LECTURE_DES_INFORMATIONS 3
-    #define CPLS_ENVOIE_DES_INFORMATIONS 4
-    #define CPLS_FIN_DE_LA_COMMUNICATION 5
-    #define CPLS_SOUS_PROCESSUS_TERMINER 6
-    #define CPLS_CONNEXION_CLIENT_EFFECTUER 7
-    #define CPLS_DATA_ENVOYER 8
+#define CPLS_ECHANGE_OUVERT 1
+#define CPLS_INFORMATION_RECU 2
+#define CPLS_LECTURE_DES_INFORMATIONS 3
+#define CPLS_ENVOIE_DES_INFORMATIONS 4
+#define CPLS_FIN_DE_LA_COMMUNICATION 5
+#define CPLS_SOUS_PROCESSUS_TERMINER 6
+#define CPLS_CONNEXION_CLIENT_EFFECTUER 7
+#define CPLS_DATA_ENVOYER 8
 
 #define T_CPLS_SERVEUR_WARN 2
-    #define CPLS_PAS_DE_message 1
-    #define CPLS_message_LENTE 2
-    #define CPLS_COMMANDE_INCOMPRISE 3
+#define CPLS_PAS_DE_message 1
+#define CPLS_message_LENTE 2
+#define CPLS_COMMANDE_INCOMPRISE 3
 
 #define T_CPLS_SERVEUR_ERRO 3
-    #define CPLS_PROBLEME_CREATION_SOCKET 2
-    #define CPLS_PROBLEME_CONNEXION_AVEC_LA_BD 3
+#define CPLS_PROBLEME_CREATION_SOCKET 2
+#define CPLS_PROBLEME_CONNEXION_AVEC_LA_BD 3
 
 #define T_CPLS_SERVEUR_INI 4
-    #define CPLS_CREATION_DE_LA_CONNEXION 1
-    #define CPLS_CREATION_DU_SOCKET 2
-    #define CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD 3
-    #define CPLS_CONNECTER_A_LA_BASE 4
+#define CPLS_CREATION_DE_LA_CONNEXION 1
+#define CPLS_CREATION_DU_SOCKET 2
+#define CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD 3
+#define CPLS_CONNECTER_A_LA_BASE 4
 
 #define T_CPLS_MSG_CLIENT 5
 
 #define LONGUEUR_MSG 1024
 #define LONGUEUR_BORDEREAU 33
 
-#define MAX_LIVREUR 5 
+#define MAX_LIVREUR 5
 #define MD5_SIZE 33
 
 // Constantes liée à la livraison du colis (étape 9)
@@ -130,13 +129,11 @@ const t_chaine RS_LIVREUR_MAX = {"FULL\n"};
 
 /***************************************** */
 
-
-// ET = en-tête 
+// ET = en-tête
 // Les différent type de messages
 const t_chaine ET_DATA = {"DATA"};
 const t_chaine ET_MESSAGE = {"MESSAGE"};
 const t_chaine ET_IMAGE = {"IMAGE"};
-
 
 // MU = message utilisateur
 /***************************************** */
@@ -171,9 +168,7 @@ const char MU_AVPOR_INFO_IMAGE[] = "GET_INFO_IMG %s";
 
 // MDLS = message de la simulation
 /***************************************** */
-const char MDLS_NEXT_STEP[] = "NEXT"; 
-
-
+const char MDLS_NEXT_STEP[] = "NEXT";
 
 // EN-TETE FONCTIONS
 void message_console_serveur(int type, int msg);
@@ -187,15 +182,13 @@ int lire(int cnx, t_chaine *buffer);
 int connexion(int cnx, PGconn *conn);
 int gestion_des_message(int cnx, PGconn *conn);
 int get_etat_livraison(t_chaine *message);
-int get_image(size_t taille, int cnx, t_image *image);
+int get_image(size_t taille, int cnx);
 int cree_bordereau(t_chaine *message, char *id, PGconn *conn);
 int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, int *cnx);
 
-
 static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
-    {0, 0, 0, 0}
-};
+    {0, 0, 0, 0}};
 
 /**
  * @fn int main()
@@ -211,8 +204,8 @@ int main(int argc, char *argv[])
     int options;
     while ((options = getopt_long(argc, argv, "h", long_options, NULL)) != -1)
     {
-    switch (options)
-    {
+        switch (options)
+        {
         case 'h':
             opt_help(argv[0]);
             return EXIT_SUCCESS;
@@ -242,15 +235,15 @@ int main(int argc, char *argv[])
     // Init du système de communication
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION);
 
-    //socket en comm avec le client
+    // socket en comm avec le client
     int sock;
 
-    //resultat de certaine fonction
+    // resultat de certaine fonction
     int ret;
 
     // Générateur de nb pseudo aléatoire
-    srand( time( NULL ) );
-    
+    srand(time(NULL));
+
     struct sockaddr_in addr;
     int size;
     int cnx;
@@ -268,7 +261,8 @@ int main(int argc, char *argv[])
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DU_SOCKET);
     sock = socket(AF_INET, SOCK_STREAM, 0);
 
-    if(sock == -1){
+    if (sock == -1)
+    {
         close(sock);
         return EXIT_FAILURE;
     }
@@ -280,16 +274,16 @@ int main(int argc, char *argv[])
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
-    
+
     // connexion effectuer au serveur
     message_console_serveur(T_CPLS_SERVEUR_INI, CPLS_CREATION_DE_LA_CONNEXION_AVEC_LA_BD);
-    
+
     addr.sin_addr.s_addr = inet_addr(adresse);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
     size = sizeof(conn_addr);
-    
+
     ret = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
     if (ret == -1)
     {
@@ -299,7 +293,7 @@ int main(int argc, char *argv[])
 
     ret = listen(sock, 1);
     if (ret == -1)
-    {   
+    {
         return EXIT_FAILURE;
     }
 
@@ -308,7 +302,7 @@ int main(int argc, char *argv[])
 
         cnx = accept(sock, (struct sockaddr *)&conn_addr, (socklen_t *)&size);
         pid_t pid = fork();
-        srand( time( NULL ) );
+        srand(time(NULL));
 
         if (pid == 0)
         {
@@ -340,7 +334,11 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
-
+/**
+ * @fn void opt_help(const char *nom_prg)
+ * @brief Retourne une aide lorsque l'option --help est rentré
+ * @param nom_prg nom de l'executable
+ */
 void opt_help(const char *nom_prg)
 {
     printf(
@@ -355,10 +353,8 @@ void opt_help(const char *nom_prg)
         "Exemple:\n"
         "  %s 127.0.0.1 4242\n",
         nom_prg,
-        nom_prg
-    );
+        nom_prg);
 }
-
 
 /**
  * @fn int lire(int cnx, t_chaine *buffer)
@@ -426,8 +422,8 @@ int connexion(int cnx, PGconn *conn)
             NULL,
             0);
 
-        
-        if(PQntuples(res) == 1){
+        if (PQntuples(res) == 1)
+        {
             demande_correcte = true;
         }
         PQclear(res);
@@ -441,10 +437,9 @@ int connexion(int cnx, PGconn *conn)
     {
         write(cnx, RS_CONNECTER, strlen(RS_CONNECTER));
     }
-    //Fermer la connexion
+    // Fermer la connexion
     return demande_correcte;
 }
-
 
 /**
  * @fn int gestion_des_message(int cnx, PGconn *conn)
@@ -464,9 +459,9 @@ int gestion_des_message(int cnx, PGconn *conn)
     t_chaine message = {'\0'};
     // Resultat des fonctions
     int res;
-    
+
     message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_CONNEXION_CLIENT_EFFECTUER);
-    
+
     do
     {
 
@@ -484,74 +479,82 @@ int gestion_des_message(int cnx, PGconn *conn)
 
         message_console_serveur(T_CPLS_SERVEUR_INFO, CPLS_ENVOIE_DES_INFORMATIONS);
 
-        
-
         // Crée un nouveau bordereau
         if (sscanf(buffer, MU_CREE, param) == 1)
         {
             t_chaine message;
             res = cree_bordereau(&message, param, conn);
 
-            if(res == ERROR){
+            if (res == ERROR)
+            {
                 write(cnx, RS_ERROR, strlen(RS_ERROR));
             }
-            else if(res == LIVREUR_FULL){
+            else if (res == LIVREUR_FULL)
+            {
                 write(cnx, RS_LIVREUR_MAX, strlen(RS_LIVREUR_MAX));
             }
-            else if(res == DONE){
+            else if (res == DONE)
+            {
                 // Envoyer à l'utilisateur son bordereau
                 write(cnx, &message, strlen(message));
             }
-        }           
-        // Pour récuperer l'image 
-        else if (sscanf(buffer, MU_AVOIR_IMAGE, param) == 1){
-            t_image image;
+        }
+        // Pour récuperer l'image
+        else if (sscanf(buffer, MU_AVOIR_IMAGE, param) == 1)
+        {
 
-            int res = get_image(get_taille_image(), cnx, &image);
+            size_t res = get_image(get_taille_image(), cnx);
 
-            if(res == ERROR){
+            if (res == ERROR)
+            {
                 write(cnx, RS_ERROR, strlen(RS_ERROR));
             }
-            else{
+            else
+            {
                 write(cnx, message, strlen(message));
             }
         }
 
         // Pour avoir les information de l'image
-        else if (sscanf(buffer, MU_AVPOR_INFO_IMAGE, param) == 1){
+        else if (sscanf(buffer, MU_AVPOR_INFO_IMAGE, param) == 1)
+        {
             size_t res = get_info_image(&message);
 
-            if(res == ERROR){
+            if (res == ERROR)
+            {
                 write(cnx, RS_ERROR, strlen(RS_ERROR));
             }
-            else{
+            else
+            {
                 write(cnx, message, strlen(message));
             }
-
         }
         // Pour avoir l'état de la livraison arrivé à l'étape 9
-        else if (strncmp(buffer, MU_AVOIR_ETAT_LIVRAISON, strlen(MU_AVOIR_ETAT_LIVRAISON)) == 0){
+        else if (strncmp(buffer, MU_AVOIR_ETAT_LIVRAISON, strlen(MU_AVOIR_ETAT_LIVRAISON)) == 0)
+        {
             int res = get_etat_livraison(&message);
 
-            if(res == ERROR){
+            if (res == ERROR)
+            {
                 write(cnx, RS_ERROR, strlen(RS_ERROR));
             }
-            else{
+            else
+            {
                 write(cnx, message, strlen(message));
             }
-
         }
         // Donner le suivit d'une commande donnée
         else if (sscanf(buffer, MU_RECUPERER, param) == 1)
         {
             res = get_etat_utilisateur(&param, conn, &message, &cnx);
-            if(res == ERROR){
-                write(cnx, RS_ERROR, strlen(RS_ERROR));    
+            if (res == ERROR)
+            {
+                write(cnx, RS_ERROR, strlen(RS_ERROR));
             }
-            else{
+            else
+            {
                 write(cnx, message, strlen(message));
             }
-            
         }
         // Hello Serveur si on veux...
         else if (strncmp(buffer, MU_BONJOUR, strlen(MU_BONJOUR)) == 0)
@@ -564,7 +567,8 @@ int gestion_des_message(int cnx, PGconn *conn)
             en_fonctionnement = false;
         }
         // FAIRE PASSER LE TEMPS,  CMD RESERVER AU SIMULATEUR
-        else if(strncmp(buffer, MDLS_NEXT_STEP, strlen(MDLS_NEXT_STEP) -1) == 0){
+        else if (strncmp(buffer, MDLS_NEXT_STEP, strlen(MDLS_NEXT_STEP) - 1) == 0)
+        {
             passer_temps(conn);
         }
         // Message par défaut qui prévient d'une erreur dans la saisie de la commande
@@ -730,14 +734,14 @@ int cree_bordereau(t_chaine *message, char *id, PGconn *conn)
 
     PGresult *res = PQexec(
         conn,
-        "SELECT count(*) FROM delivraptor.utilisateur WHERE etape <= 3"
-    );
+        "SELECT count(*) FROM delivraptor.utilisateur WHERE etape <= 3");
 
     t_chaine nb_element_etape = {'\0'};
     strcpy(nb_element_etape, PQgetvalue(res, 0, 0));
     int nb_elt = atoi(PQgetvalue(res, 0, 0));
     PQclear(res);
-    if (nb_elt >= MAX_LIVREUR){
+    if (nb_elt >= MAX_LIVREUR)
+    {
         return_status = LIVREUR_FULL;
     }
 
@@ -752,9 +756,9 @@ int cree_bordereau(t_chaine *message, char *id, PGconn *conn)
 
         // Décomposer la variable t pour la mettre dans le bordereau temporaire
         strftime(bordereau_temp, sizeof(bordereau_temp), "%H%M%S", t); // Kaout an amzer barzh ur chadenn
-        
+
         // Ajouter l'id de la commande après
-        strcat(bordereau_temp, id);                               
+        strcat(bordereau_temp, id);
 
         // Mettre le tout dans le bordereau définitive
         snprintf(*message, sizeof(*message), "%s | %s\n", ET_DATA, bordereau_temp);
@@ -774,12 +778,12 @@ int cree_bordereau(t_chaine *message, char *id, PGconn *conn)
             NULL,
             0);
     }
-    else{
+    else
+    {
         return_status = ERROR;
     }
     return return_status;
 }
-
 
 /**
  * @fn int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, int *cnx)
@@ -807,53 +811,59 @@ int get_etat_utilisateur(t_chaine *bordereau, PGconn *conn, t_chaine *message, i
 
     int rows = PQntuples(res);
     int cols = PQnfields(res);
-    
-    
-    if (rows == 0){
+
+    if (rows == 0)
+    {
         return_status = ERROR;
     }
-    else{
-        snprintf(*message + strlen(*message), LONGUEUR_MSG + strlen(*message),  "%s | ", ET_DATA);
+    else
+    {
+        snprintf(*message + strlen(*message), LONGUEUR_MSG + strlen(*message), "%s | ", ET_DATA);
 
         for (int i = 0; i < rows; i++)
         {
             for (int j = 0; j < cols; j++)
             {
                 size_t len = strlen(*message);
-                if(j + 1 == cols)
+                if (j + 1 == cols)
                 {
-                    snprintf
-                        (*message + len, LONGUEUR_MSG - len,
-                            "%s\n",
-                            PQgetvalue(res, i, j)
-                        );
+                    snprintf(*message + len, LONGUEUR_MSG - len,
+                             "%s\n",
+                             PQgetvalue(res, i, j));
                 }
                 else
                 {
-                    snprintf
-                        (*message + len, LONGUEUR_MSG - len,
-                            "%s | ",
-                            PQgetvalue(res, i, j)
-                        );
+                    snprintf(*message + len, LONGUEUR_MSG - len,
+                             "%s | ",
+                             PQgetvalue(res, i, j));
                 }
             }
         }
-        if (atoi(PQgetvalue(res, 0, 1)) == 9){
+        if (atoi(PQgetvalue(res, 0, 1)) == 9)
+        {
             return_status = ARRIVED;
         }
     }
-    
+
     PQclear(res);
 
     return return_status;
 }
 
-size_t get_info_image(t_chaine *message){
+/**
+ * @fn size_t get_info_image(t_chaine *message)
+ * @brief renvoie le nombre d'octet de l'image voulu avec un message
+ * @param message passage du pointeur pour crée le message de renvoyé par l'utilisateur après
+ * @return retourne la taille de l'image au format size_t
+ */
+size_t get_info_image(t_chaine *message)
+{
     size_t taille;
 
     // Récupérer la taille de l'image
     struct stat st;
-    if(stat(IMAGE_PATH, &st) == 0){
+    if (stat(IMAGE_PATH, &st) == 0)
+    {
         // Permet d'envoyer la taille de l'image au script php
         taille = st.st_size;
     }
@@ -861,46 +871,66 @@ size_t get_info_image(t_chaine *message){
     return taille;
 }
 
-size_t get_taille_image(){
+/**
+ * @fn size_t get_taille_image()
+ * @brief renvoie le nombre d'octet de l'image voulu
+ * @return retourne la taille de l'image au format size_t
+ */
+size_t get_taille_image()
+{
     size_t taille;
 
     // Récupérer la taille de l'image
     struct stat st;
-    if(stat(IMAGE_PATH, &st) == 0){
+    if (stat(IMAGE_PATH, &st) == 0)
+    {
         // Permet d'envoyer la taille de l'image au script php
         taille = st.st_size;
     }
     return taille;
 }
 
-int get_image(size_t taille, int cnx, t_image *image){
+/**
+ * @fn int get_image(size_t taille, int cnx, t_image *image)
+ * @brief envoie au client l'image par des paquet de 8192 octets
+ * @param taille la taille de l'image, récupéré plus tot avec une précédente fonction
+ * @param cnx la connexion
+ * @return retourne un entier pour signalé si l'envoie c'est bien passé
+ */
+int get_image(size_t taille, int cnx)
+{
+    t_image image;
     int return_value = DONE;
 
     // Ouvrir l'image :
     FILE *fd = fopen(IMAGE_PATH, "rb");
 
-    
-    if(return_value == 0){
-        //Envoie de l'image par paquet de 8192 octets
+    if (return_value == 0)
+    {
+        // Envoie de l'image par paquet de 8192 octets
 
-        // Variable qui se remplit tout au long de l'envoie de l'image 
+        // Variable qui se remplit tout au long de l'envoie de l'image
         size_t taille_deja_envoyer = 0;
         // Var qui va s'ajuster pour ne pas faire passer plus d'octet que nécéssaire
         size_t taille_paquet = IMAGE_SIZE;
 
-        while(fread(image, sizeof(taille_paquet), 1, fd) != 0){
-            write(cnx, image, sizeof(image)); 
+        while (fread(image, sizeof(taille_paquet), 1, fd) != 0)
+        {
+            write(cnx, image, sizeof(image));
 
-            if(taille_deja_envoyer + IMAGE_SIZE < taille)
+            if (taille_deja_envoyer + IMAGE_SIZE < taille)
             {
                 taille_deja_envoyer = taille_deja_envoyer + IMAGE_SIZE;
             }
-            else{
+            else
+            {
                 taille_paquet = (taille_deja_envoyer + IMAGE_SIZE) - taille;
             }
         }
     }
-    if(fd != NULL){
+    if (fd != NULL)
+    {
+        return_value = ERROR;
         fclose(fd);
     }
 
@@ -912,37 +942,37 @@ int get_image(size_t taille, int cnx, t_image *image){
  * @brief permet de savoir si le colis à été reçus, refuser ou mis en boite au lettre
  * @param message est le message qui sera retourner au client
  */
-int get_etat_livraison(t_chaine *message){
-    int etat_livrer = rand()%3;
-    
-    if(etat_livrer == 2){
-        int excuse = rand()%5;
-        
+int get_etat_livraison(t_chaine *message)
+{
+    int etat_livrer = rand() % 3;
+
+    if (etat_livrer == 2)
+    {
+        int excuse = rand() % 5;
+
         snprintf(
-            *message, LONGUEUR_MSG, "%s | %d | %d\n", 
-            ET_DATA, etat_livrer, excuse         
-        );
+            *message, LONGUEUR_MSG, "%s | %d | %d\n",
+            ET_DATA, etat_livrer, excuse);
     }
-    else{
+    else
+    {
         snprintf(
-            *message, LONGUEUR_MSG, "%s | %d\n", 
-            ET_DATA, etat_livrer         
-        );
+            *message, LONGUEUR_MSG, "%s | %d\n",
+            ET_DATA, etat_livrer);
     }
     return DONE;
 }
-
 
 /**
  * @fn passer_temps(PGconn *conn)
  * @brief fait passer le temps
  * @param conn Pour mettre à jour la base de donnée
  */
-void passer_temps(PGconn *conn){
+void passer_temps(PGconn *conn)
+{
     PGresult *res = PQexec(
         conn,
-        "UPDATE delivraptor.utilisateur SET etape = etape + 1 WHERE etape < 9"
-    );
+        "UPDATE delivraptor.utilisateur SET etape = etape + 1 WHERE etape < 9");
 
     PQclear(res);
 }
